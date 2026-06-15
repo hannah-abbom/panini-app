@@ -13,6 +13,7 @@ import time
 from pathlib import Path
 
 from .config import BASE_DIR
+from .data import statsbomb
 from .data.wc2026_fixtures import PLAYED_RESULTS
 from .models import elo, ratings
 
@@ -28,6 +29,10 @@ def _base_ratings() -> dict[str, float]:
     always reflects what has actually happened so far.
     """
     r = dict(ratings.SEED_RATINGS)
+    # Real-results prior from StatsBomb open data (bounded, defensive).
+    for team, delta in statsbomb.team_deltas().items():
+        if team in r:
+            r[team] = round(r[team] + delta, 1)
     for home, away, gh, ga in PLAYED_RESULTS:
         h, a = ratings.canonical(home), ratings.canonical(away)
         rh = r.get(h, ratings.DEFAULT_RATING)

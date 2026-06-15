@@ -26,7 +26,7 @@ from . import stats as stats_model
 
 MAX_GOALS = 10                 # score matrix goes 0..MAX_GOALS for each team
 ELO_PER_GOAL = 165.0           # Elo gap that corresponds to ~1 goal of supremacy
-BASE_TOTAL_GOALS = 2.65        # average goals in a balanced World Cup match
+BASE_TOTAL_GOALS = 2.55        # avg goals/game, calibrated on StatsBomb open data (~2.50)
 TOTAL_GOALS_SPREAD = 0.18      # mismatches produce slightly more total goals
 DIXON_COLES_RHO = -0.06        # low-score dependency correction
 MIN_LAMBDA = 0.18              # floor so no team is ever exactly zero
