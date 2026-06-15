@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Panini · World Cup predictions</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">⚽ Panini</div>
+    <div class="spacer"></div>
+    <span id="source-badge" class="badge"></span>
+    <button id="logout" class="ghost">Log out</button>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="fixtures">Fixtures</button>
+    <button class="tab" data-tab="matchup">Custom matchup</button>
+    <button class="tab" data-tab="value">Value calculator</button>
+  </nav>
+
+  <main>
+    <!-- Fixtures ------------------------------------------------------->
+    <section id="tab-fixtures" class="tab-panel active">
+      <p class="hint">Predicted from World-Football-Elo ratings via a
+        Dixon-Coles/Poisson goal model. Tap a match for full markets.</p>
+      <div id="fixtures" class="cards"></div>
+    </section>
+
+    <!-- Custom matchup ------------------------------------------------->
+    <section id="tab-matchup" class="tab-panel">
+      <div class="picker">
+        <select id="home-team"></select>
+        <span class="vs">vs</span>
+        <select id="away-team"></select>
+        <label class="check">
+          <input type="checkbox" id="home-adv" />
+          home advantage for first team
+        </label>
+        <button id="run-matchup">Predict</button>
+      </div>
+      <div id="matchup-result"></div>
+    </section>
+
+    <!-- Value calculator ----------------------------------------------->
+    <section id="tab-value" class="tab-panel">
+      <p class="hint">Enter the model's probability and the bookmaker's
+        decimal odds to see your edge and a Kelly-criterion stake.</p>
+      <div class="value-form">
+        <label>Model probability (%)
+          <input type="number" id="v-prob" step="0.1" placeholder="42.5" />
+        </label>
+        <label>Bookmaker odds (decimal)
+          <input type="number" id="v-odds" step="0.01" placeholder="2.40" />
+        </label>
+        <button id="run-value">Calculate</button>
+      </div>
+      <div id="value-result"></div>
+    </section>
+  </main>
+
+  <!-- Match detail modal ----------------------------------------------->
+  <div id="modal" class="modal" hidden>
+    <div class="modal-card">
+      <button id="modal-close" class="modal-close">×</button>
+      <div id="modal-body"></div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
