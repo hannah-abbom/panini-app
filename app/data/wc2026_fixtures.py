@@ -1,107 +1,130 @@
 """The actual 2026 FIFA World Cup group stage — all 72 fixtures.
 
-Real groups (final draw, 5 Dec 2025) and the real match calendar
-(11–27 June 2026). Used as the authoritative fixture list when live providers
-are unreachable, and as the offline source of truth for predictions.
+Real groups (final draw, 5 Dec 2025), the real match calendar with exact UTC
+kickoff times (11–27 June 2026), and the real results of matches already played.
+Used as the authoritative fixture list when live providers are unreachable, and
+as the offline source of truth for predictions.
 
-Source rows are terse tuples: (date, kickoff_utc, group, home, away). Team names
-match the published schedule; ratings.canonical() maps them to rating keys.
-Kickoff times are representative — dates are exact.
+PLAYED_RESULTS feeds the rating engine (see store.py) so ratings reflect what has
+actually happened so far.
 """
 from __future__ import annotations
 
-# (date "MM-DD", "HH:MM" UTC, group letter, home, away)
-_SCHEDULE: list[tuple[str, str, str, str, str]] = [
+# (utc kickoff ISO, group letter, home, away)
+_SCHEDULE: list[tuple[str, str, str, str]] = [
     # Matchday 1
-    ("06-11", "19:00", "A", "Mexico", "South Africa"),
-    ("06-11", "22:00", "A", "South Korea", "Czechia"),
-    ("06-12", "19:00", "B", "Canada", "Bosnia and Herzegovina"),
-    ("06-12", "22:00", "D", "USA", "Paraguay"),
-    ("06-13", "16:00", "B", "Qatar", "Switzerland"),
-    ("06-13", "19:00", "C", "Brazil", "Morocco"),
-    ("06-13", "22:00", "C", "Haiti", "Scotland"),
-    ("06-13", "23:00", "D", "Australia", "Turkiye"),
-    ("06-14", "16:00", "E", "Germany", "Curacao"),
-    ("06-14", "18:00", "F", "Netherlands", "Japan"),
-    ("06-14", "21:00", "E", "Ivory Coast", "Ecuador"),
-    ("06-14", "23:00", "F", "Sweden", "Tunisia"),
-    ("06-15", "16:00", "H", "Spain", "Cape Verde"),
-    ("06-15", "18:00", "G", "Belgium", "Egypt"),
-    ("06-15", "21:00", "H", "Saudi Arabia", "Uruguay"),
-    ("06-15", "23:00", "G", "Iran", "New Zealand"),
-    ("06-16", "16:00", "I", "France", "Senegal"),
-    ("06-16", "18:00", "I", "Iraq", "Norway"),
-    ("06-16", "21:00", "J", "Argentina", "Algeria"),
-    ("06-16", "23:00", "J", "Austria", "Jordan"),
-    ("06-17", "16:00", "K", "Portugal", "DR Congo"),
-    ("06-17", "18:00", "L", "England", "Croatia"),
-    ("06-17", "21:00", "L", "Ghana", "Panama"),
-    ("06-17", "23:00", "K", "Uzbekistan", "Colombia"),
+    ("2026-06-11T19:00:00Z", "A", "Mexico", "South Africa"),
+    ("2026-06-12T02:00:00Z", "A", "South Korea", "Czechia"),
+    ("2026-06-12T19:00:00Z", "B", "Canada", "Bosnia and Herzegovina"),
+    ("2026-06-13T01:00:00Z", "D", "USA", "Paraguay"),
+    ("2026-06-13T19:00:00Z", "B", "Qatar", "Switzerland"),
+    ("2026-06-13T22:00:00Z", "C", "Brazil", "Morocco"),
+    ("2026-06-14T01:00:00Z", "C", "Haiti", "Scotland"),
+    ("2026-06-14T04:00:00Z", "D", "Australia", "Turkiye"),
+    ("2026-06-14T17:00:00Z", "E", "Germany", "Curacao"),
+    ("2026-06-14T20:00:00Z", "F", "Netherlands", "Japan"),
+    ("2026-06-14T23:00:00Z", "E", "Ivory Coast", "Ecuador"),
+    ("2026-06-15T02:00:00Z", "F", "Sweden", "Tunisia"),
+    ("2026-06-15T16:00:00Z", "H", "Spain", "Cape Verde"),
+    ("2026-06-15T19:00:00Z", "G", "Belgium", "Egypt"),
+    ("2026-06-15T22:00:00Z", "H", "Saudi Arabia", "Uruguay"),
+    ("2026-06-16T01:00:00Z", "G", "Iran", "New Zealand"),
+    ("2026-06-16T19:00:00Z", "I", "France", "Senegal"),
+    ("2026-06-16T22:00:00Z", "I", "Iraq", "Norway"),
+    ("2026-06-17T01:00:00Z", "J", "Argentina", "Algeria"),
+    ("2026-06-17T04:00:00Z", "J", "Austria", "Jordan"),
+    ("2026-06-17T17:00:00Z", "K", "Portugal", "DR Congo"),
+    ("2026-06-17T20:00:00Z", "L", "England", "Croatia"),
+    ("2026-06-17T23:00:00Z", "L", "Ghana", "Panama"),
+    ("2026-06-18T02:00:00Z", "K", "Uzbekistan", "Colombia"),
     # Matchday 2
-    ("06-18", "16:00", "A", "Czechia", "South Africa"),
-    ("06-18", "18:00", "B", "Switzerland", "Bosnia and Herzegovina"),
-    ("06-18", "21:00", "B", "Canada", "Qatar"),
-    ("06-18", "23:00", "A", "Mexico", "South Korea"),
-    ("06-19", "16:00", "C", "Scotland", "Morocco"),
-    ("06-19", "18:00", "D", "USA", "Australia"),
-    ("06-19", "21:00", "C", "Brazil", "Haiti"),
-    ("06-19", "23:00", "D", "Turkiye", "Paraguay"),
-    ("06-20", "16:00", "F", "Netherlands", "Sweden"),
-    ("06-20", "18:00", "E", "Germany", "Ivory Coast"),
-    ("06-20", "21:00", "E", "Ecuador", "Curacao"),
-    ("06-20", "23:00", "F", "Tunisia", "Japan"),
-    ("06-21", "16:00", "H", "Spain", "Saudi Arabia"),
-    ("06-21", "18:00", "G", "Belgium", "Iran"),
-    ("06-21", "21:00", "H", "Uruguay", "Cape Verde"),
-    ("06-21", "23:00", "G", "New Zealand", "Egypt"),
-    ("06-22", "16:00", "J", "Argentina", "Austria"),
-    ("06-22", "18:00", "I", "France", "Iraq"),
-    ("06-22", "21:00", "I", "Norway", "Senegal"),
-    ("06-22", "23:00", "J", "Jordan", "Algeria"),
-    ("06-23", "16:00", "K", "Portugal", "Uzbekistan"),
-    ("06-23", "18:00", "L", "England", "Ghana"),
-    ("06-23", "21:00", "L", "Panama", "Croatia"),
-    ("06-23", "23:00", "K", "Colombia", "DR Congo"),
+    ("2026-06-18T16:00:00Z", "A", "Czechia", "South Africa"),
+    ("2026-06-18T19:00:00Z", "B", "Switzerland", "Bosnia and Herzegovina"),
+    ("2026-06-18T22:00:00Z", "B", "Canada", "Qatar"),
+    ("2026-06-19T01:00:00Z", "A", "Mexico", "South Korea"),
+    ("2026-06-19T19:00:00Z", "D", "USA", "Australia"),
+    ("2026-06-19T22:00:00Z", "C", "Scotland", "Morocco"),
+    ("2026-06-20T00:30:00Z", "C", "Brazil", "Haiti"),
+    ("2026-06-20T03:00:00Z", "D", "Turkiye", "Paraguay"),
+    ("2026-06-20T17:00:00Z", "F", "Netherlands", "Sweden"),
+    ("2026-06-20T20:00:00Z", "E", "Germany", "Ivory Coast"),
+    ("2026-06-21T03:00:00Z", "E", "Ecuador", "Curacao"),
+    ("2026-06-21T04:00:00Z", "F", "Tunisia", "Japan"),
+    ("2026-06-21T16:00:00Z", "H", "Spain", "Saudi Arabia"),
+    ("2026-06-21T19:00:00Z", "G", "Belgium", "Iran"),
+    ("2026-06-21T22:00:00Z", "H", "Uruguay", "Cape Verde"),
+    ("2026-06-22T01:00:00Z", "G", "New Zealand", "Egypt"),
+    ("2026-06-22T17:00:00Z", "J", "Argentina", "Austria"),
+    ("2026-06-22T21:00:00Z", "I", "France", "Iraq"),
+    ("2026-06-23T00:00:00Z", "I", "Norway", "Senegal"),
+    ("2026-06-23T03:00:00Z", "J", "Jordan", "Algeria"),
+    ("2026-06-23T17:00:00Z", "K", "Portugal", "Uzbekistan"),
+    ("2026-06-23T20:00:00Z", "L", "England", "Ghana"),
+    ("2026-06-23T23:00:00Z", "L", "Panama", "Croatia"),
+    ("2026-06-24T02:00:00Z", "K", "Colombia", "DR Congo"),
     # Matchday 3 (simultaneous kickoffs)
-    ("06-24", "19:00", "B", "Switzerland", "Canada"),
-    ("06-24", "19:00", "B", "Bosnia and Herzegovina", "Qatar"),
-    ("06-24", "23:00", "C", "Scotland", "Brazil"),
-    ("06-24", "23:00", "C", "Morocco", "Haiti"),
-    ("06-24", "01:00", "A", "Czechia", "Mexico"),
-    ("06-24", "01:00", "A", "South Africa", "South Korea"),
-    ("06-25", "19:00", "E", "Ecuador", "Germany"),
-    ("06-25", "19:00", "E", "Curacao", "Ivory Coast"),
-    ("06-25", "23:00", "F", "Japan", "Sweden"),
-    ("06-25", "23:00", "F", "Tunisia", "Netherlands"),
-    ("06-25", "01:00", "D", "Turkiye", "USA"),
-    ("06-25", "01:00", "D", "Paraguay", "Australia"),
-    ("06-26", "19:00", "I", "Norway", "France"),
-    ("06-26", "19:00", "I", "Senegal", "Iraq"),
-    ("06-26", "21:00", "H", "Cape Verde", "Saudi Arabia"),
-    ("06-26", "21:00", "H", "Uruguay", "Spain"),
-    ("06-26", "23:00", "G", "Egypt", "Iran"),
-    ("06-26", "23:00", "G", "New Zealand", "Belgium"),
-    ("06-27", "19:00", "L", "Panama", "England"),
-    ("06-27", "19:00", "L", "Croatia", "Ghana"),
-    ("06-27", "21:00", "K", "Colombia", "Portugal"),
-    ("06-27", "21:00", "K", "DR Congo", "Uzbekistan"),
-    ("06-27", "23:00", "J", "Algeria", "Austria"),
-    ("06-27", "23:00", "J", "Jordan", "Argentina"),
+    ("2026-06-24T19:00:00Z", "B", "Switzerland", "Canada"),
+    ("2026-06-24T19:00:00Z", "B", "Bosnia and Herzegovina", "Qatar"),
+    ("2026-06-24T22:00:00Z", "C", "Scotland", "Brazil"),
+    ("2026-06-24T22:00:00Z", "C", "Morocco", "Haiti"),
+    ("2026-06-25T01:00:00Z", "A", "Czechia", "Mexico"),
+    ("2026-06-25T01:00:00Z", "A", "South Africa", "South Korea"),
+    ("2026-06-25T20:00:00Z", "E", "Ecuador", "Germany"),
+    ("2026-06-25T20:00:00Z", "E", "Curacao", "Ivory Coast"),
+    ("2026-06-25T23:00:00Z", "F", "Japan", "Sweden"),
+    ("2026-06-25T23:00:00Z", "F", "Tunisia", "Netherlands"),
+    ("2026-06-26T02:00:00Z", "D", "Turkiye", "USA"),
+    ("2026-06-26T02:00:00Z", "D", "Paraguay", "Australia"),
+    ("2026-06-26T19:00:00Z", "I", "Norway", "France"),
+    ("2026-06-26T19:00:00Z", "I", "Senegal", "Iraq"),
+    ("2026-06-27T00:00:00Z", "H", "Cape Verde", "Saudi Arabia"),
+    ("2026-06-27T00:00:00Z", "H", "Uruguay", "Spain"),
+    ("2026-06-27T03:00:00Z", "G", "Egypt", "Iran"),
+    ("2026-06-27T03:00:00Z", "G", "New Zealand", "Belgium"),
+    ("2026-06-27T21:00:00Z", "L", "Panama", "England"),
+    ("2026-06-27T21:00:00Z", "L", "Croatia", "Ghana"),
+    ("2026-06-27T23:30:00Z", "K", "Colombia", "Portugal"),
+    ("2026-06-27T23:30:00Z", "K", "DR Congo", "Uzbekistan"),
+    ("2026-06-28T02:00:00Z", "J", "Algeria", "Austria"),
+    ("2026-06-28T02:00:00Z", "J", "Jordan", "Argentina"),
 ]
+
+# Real results of matches already played (home, away, goals_home, goals_away).
+PLAYED_RESULTS: list[tuple[str, str, int, int]] = [
+    ("Mexico", "South Africa", 2, 0),
+    ("South Korea", "Czechia", 2, 1),
+    ("Canada", "Bosnia and Herzegovina", 1, 1),
+    ("USA", "Paraguay", 4, 1),
+    ("Qatar", "Switzerland", 1, 1),
+    ("Brazil", "Morocco", 1, 1),
+    ("Haiti", "Scotland", 0, 1),
+    ("Australia", "Turkiye", 2, 0),
+    ("Germany", "Curacao", 7, 1),
+    ("Netherlands", "Japan", 2, 2),
+    ("Ivory Coast", "Ecuador", 1, 0),
+    ("Sweden", "Tunisia", 5, 1),
+]
+
+_RESULT_MAP = {(h, a): (gh, ga) for h, a, gh, ga in PLAYED_RESULTS}
 
 
 def _build() -> list[dict]:
     out = []
-    for i, (date, time, group, home, away) in enumerate(_SCHEDULE, start=1):
-        out.append({
+    for i, (utc, group, home, away) in enumerate(_SCHEDULE, start=1):
+        fx = {
             "id": f"wc2026-{i:02d}",
             "home": home,
             "away": away,
-            "utc_date": f"2026-{date}T{time}:00Z",
+            "utc_date": utc,
             "status": "upcoming",
             "round": f"Group {group}",
             "source": "schedule",
-        })
+        }
+        if (home, away) in _RESULT_MAP:
+            gh, ga = _RESULT_MAP[(home, away)]
+            fx.update(status="finished", goals_home=gh, goals_away=ga,
+                      score=f"{gh}-{ga}")
+        out.append(fx)
     return out
 
 

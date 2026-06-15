@@ -13,11 +13,28 @@ import time
 from pathlib import Path
 
 from .config import BASE_DIR
+from .data.wc2026_fixtures import PLAYED_RESULTS
 from .models import elo, ratings
 
 DATA_DIR = BASE_DIR / ".data"
 STORE_PATH = DATA_DIR / "store.json"
 _lock = threading.Lock()
+
+
+def _base_ratings() -> dict[str, float]:
+    """Seed ratings with the already-played World Cup results folded in.
+
+    Deterministic and independent of the mutable store, so a fresh deploy
+    always reflects what has actually happened so far.
+    """
+    r = dict(ratings.SEED_RATINGS)
+    for home, away, gh, ga in PLAYED_RESULTS:
+        h, a = ratings.canonical(home), ratings.canonical(away)
+        rh = r.get(h, ratings.DEFAULT_RATING)
+        ra = r.get(a, ratings.DEFAULT_RATING)
+        nh, na = elo.update(rh, ra, gh, ga, neutral=True)
+        r[h], r[a] = round(nh, 1), round(na, 1)
+    return r
 
 
 def _load() -> dict:
@@ -36,18 +53,18 @@ def _save(state: dict) -> None:
 
 
 def rating_for(name: str) -> float:
-    """Effective rating: seed value plus any persisted override."""
+    """Effective rating: base (seed + played results) plus any override."""
     key = ratings.canonical(name)
     state = _load()
     if key in state["overrides"]:
         return float(state["overrides"][key])
-    return ratings.rating_for(name)
+    return _base_ratings().get(key, ratings.DEFAULT_RATING)
 
 
 def all_ratings() -> dict[str, float]:
     """Every known team's current effective rating."""
     state = _load()
-    merged = dict(ratings.SEED_RATINGS)
+    merged = _base_ratings()
     merged.update({k: float(v) for k, v in state["overrides"].items()})
     return merged
 
@@ -63,8 +80,9 @@ def record_result(home: str, away: str, goals_home: int, goals_away: int,
     a_key = ratings.canonical(away)
     with _lock:
         state = _load()
-        h_before = state["overrides"].get(h_key, ratings.rating_for(home))
-        a_before = state["overrides"].get(a_key, ratings.rating_for(away))
+        base = _base_ratings()
+        h_before = state["overrides"].get(h_key, base.get(h_key, ratings.DEFAULT_RATING))
+        a_before = state["overrides"].get(a_key, base.get(a_key, ratings.DEFAULT_RATING))
         h_after, a_after = elo.update(float(h_before), float(a_before),
                                       goals_home, goals_away, neutral=neutral)
         state["overrides"][h_key] = round(h_after, 1)

@@ -52,22 +52,35 @@ function renderFixtures(list) {
   wrap.innerHTML = "";
   list.forEach((fx) => {
     const p = fx.prediction;
+    const finished = fx.status === "finished";
     const card = document.createElement("div");
-    card.className = "card";
-    card.innerHTML = `
-      <div class="round">${fx.round || ""} <span class="date">· ${fmtDate(fx.utc_date)}</span></div>
-      <div class="teams">${fx.home} <span style="color:var(--muted)">v</span> ${fx.away}</div>
-      <div class="bar">
-        <div class="seg home" style="width:${p.home_win}%">${p.home_win}%</div>
-        <div class="seg draw" style="width:${p.draw}%">${p.draw}%</div>
-        <div class="seg away" style="width:${p.away_win}%">${p.away_win}%</div>
-      </div>
-      <div class="meta">
-        <span>Score <b>${p.most_likely_score}</b></span>
-        <span>Goals <b>${p.total_goals}</b></span>
-        <span>O2.5 <b>${p.over25}%</b></span>
-        <span>BTTS <b>${p.btts}%</b></span>
-      </div>`;
+    card.className = "card" + (finished ? " finished" : "");
+    const header = finished
+      ? `${fx.round || ""} <span class="date">· Full time</span>`
+      : `${fx.round || ""} <span class="date">· ${fmtDate(fx.utc_date)}</span>`;
+    const teams = finished
+      ? `${fx.home} <span class="ft">${fx.score}</span> ${fx.away}`
+      : `${fx.home} <span style="color:var(--muted)">v</span> ${fx.away}`;
+    const body = finished
+      ? `<div class="bar pre">
+           <div class="seg home" style="width:${p.home_win}%">${p.home_win}%</div>
+           <div class="seg draw" style="width:${p.draw}%">${p.draw}%</div>
+           <div class="seg away" style="width:${p.away_win}%">${p.away_win}%</div>
+         </div>
+         <div class="meta"><span>Pre-match model prediction</span></div>`
+      : `<div class="bar">
+           <div class="seg home" style="width:${p.home_win}%">${p.home_win}%</div>
+           <div class="seg draw" style="width:${p.draw}%">${p.draw}%</div>
+           <div class="seg away" style="width:${p.away_win}%">${p.away_win}%</div>
+         </div>
+         <div class="meta">
+           <span>Score <b>${p.most_likely_score}</b></span>
+           <span>Goals <b>${p.total_goals}</b></span>
+           <span>O2.5 <b>${p.over25}%</b></span>
+           <span>BTTS <b>${p.btts}%</b></span>
+         </div>`;
+    card.innerHTML = `<div class="round">${header}</div>
+      <div class="teams">${teams}</div>${body}`;
     card.addEventListener("click", () => showDetail(fx.home, fx.away, true));
     wrap.appendChild(card);
   });
@@ -286,8 +299,19 @@ async function refreshTeams() {
 }
 
 // --- boot ------------------------------------------------------------------
+async function loadMeta() {
+  try {
+    const meta = await api("/api/meta");
+    if (!meta.auth_required) {
+      const lo = document.getElementById("logout");
+      if (lo) lo.style.display = "none";
+    }
+  } catch (e) { /* ignore */ }
+}
+
 (async function init() {
   try {
+    await loadMeta();
     await loadTeams();
     await Promise.all([loadFixtures(), loadRankings(), loadResultsLog()]);
     renderBracketPicks(8, true);

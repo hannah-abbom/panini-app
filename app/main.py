@@ -50,6 +50,11 @@ def login_page():
 
 # ---- Auth ------------------------------------------------------------------
 
+@app.get("/api/meta")
+def api_meta():
+    return {"auth_required": settings.require_auth}
+
+
 @app.post("/api/login")
 def api_login(password: str = Form(...)):
     if not check_password(password):
