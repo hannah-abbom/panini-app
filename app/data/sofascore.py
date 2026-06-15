@@ -68,6 +68,25 @@ def team_last_results(team_id: int, limit: int = 6) -> list[dict] | None:
     return out or None
 
 
+def world_cup_results(date_iso: str) -> dict | None:
+    """Finished World Cup scores for a date, keyed by (home, away) -> (gh, ga)."""
+    data = _get(f"/sport/football/scheduled-events/{date_iso}")
+    if not data:
+        return None
+    out: dict = {}
+    for ev in data.get("events", []):
+        if "World Cup" not in (ev.get("tournament") or {}).get("name", ""):
+            continue
+        if ev.get("status", {}).get("type") != "finished":
+            continue
+        try:
+            out[(ev["homeTeam"]["name"], ev["awayTeam"]["name"])] = (
+                ev["homeScore"]["current"], ev["awayScore"]["current"])
+        except (KeyError, TypeError):
+            continue
+    return out or None
+
+
 def scheduled_football(date_iso: str) -> list[dict] | None:
     """All scheduled football events for a date (YYYY-MM-DD), World Cup only."""
     data = _get(f"/sport/football/scheduled-events/{date_iso}")

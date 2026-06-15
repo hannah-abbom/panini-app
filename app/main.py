@@ -6,7 +6,7 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import store
+from . import ai, store
 from .auth import (COOKIE_NAME, SESSION_TTL_SECONDS, check_password,
                    issue_token, require_auth)
 from .config import settings
@@ -59,7 +59,24 @@ def login_page():
 
 @app.get("/api/meta")
 def api_meta():
-    return {"auth_required": settings.require_auth}
+    return {"auth_required": settings.require_auth, "ai_enabled": ai.ai_enabled()}
+
+
+class ChatRequest(BaseModel):
+    messages: list[dict]
+
+
+@app.post("/api/chat")
+def api_chat(req: ChatRequest, _: bool = Depends(require_auth)):
+    if not ai.ai_enabled():
+        return {"reply": "The AI helper isn't switched on yet. Add an "
+                "ANTHROPIC_API_KEY environment variable to enable it.",
+                "enabled": False}
+    try:
+        return {"reply": ai.chat(req.messages), "enabled": True}
+    except Exception:
+        return {"reply": "Sorry — I hit an error answering that. Try again in a moment.",
+                "enabled": True}
 
 
 @app.post("/api/login")

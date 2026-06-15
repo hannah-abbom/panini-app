@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Panini · World Cup predictions</title>
-  <link rel="stylesheet" href="/static/styles.css?v=5" />
+  <link rel="stylesheet" href="/static/styles.css?v=6" />
 </head>
 <body>
   <div class="layout">
@@ -151,6 +151,20 @@
     </main>
   </div>
 
-  <script src="/static/app.js?v=5"></script>
+  <!-- AI helper (corner) -->
+  <button id="chat-fab" title="Ask the Panini assistant">💬</button>
+  <div id="chat-panel" hidden>
+    <header class="chat-head">
+      <span>⚽ Panini assistant</span>
+      <button id="chat-close" class="chat-x">×</button>
+    </header>
+    <div id="chat-msgs" class="chat-msgs"></div>
+    <form id="chat-form" class="chat-form">
+      <input id="chat-input" placeholder="Ask about a match or a bet…" autocomplete="off" />
+      <button type="submit">↑</button>
+    </form>
+  </div>
+
+  <script src="/static/app.js?v=6"></script>
 </body>
 </html>

@@ -21,8 +21,8 @@ function fmtDay(v) {
   return d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
 }
 function heatColor(p) {
-  const t = Math.min(1, p / 22);
-  return `rgb(${Math.round(20 + t * 10)},${Math.round(40 + t * 150)},${Math.round(90 - t * 40)})`;
+  const t = Math.min(1, Math.sqrt(p / 18));   // sqrt makes low cells visible
+  return `rgb(${Math.round(16 + t * 6)},${Math.round(26 + t * 188)},${Math.round(42 + t * 40)})`;
 }
 function formLine(str) {
   if (!str) return "";
@@ -187,16 +187,24 @@ function tipBanner(d) {
   </div>`;
 }
 function heatmapMarkup(d) {
-  let cells = `<div class="lbl"></div>`;
-  for (let j = 0; j < 6; j++) cells += `<div class="lbl">${j}</div>`;
+  const m = d.matrix;
+  let mx = 0, mi = 0, mj = 0;
+  for (let i = 0; i < 6; i++) for (let j = 0; j < 6; j++) if (m[i][j] > mx) { mx = m[i][j]; mi = i; mj = j; }
+  let grid = `<div class="hm-corner"></div>`;
+  for (let j = 0; j < 6; j++) grid += `<div class="hm-ax">${j}</div>`;
   for (let i = 0; i < 6; i++) {
-    cells += `<div class="lbl">${i}</div>`;
+    grid += `<div class="hm-ax">${i}</div>`;
     for (let j = 0; j < 6; j++) {
-      const v = d.matrix[i][j];
-      cells += `<div class="cell" style="background:${heatColor(v)}" title="${i}-${j}: ${v}%">${v >= 3 ? v : ""}</div>`;
+      const v = m[i][j], sel = (i === mi && j === mj) ? " sel" : "";
+      grid += `<div class="hm-cell${sel}" style="background:${heatColor(v)}" title="${i}-${j}: ${v}%">${v >= 2 ? v : ""}</div>`;
     }
   }
-  return `<div class="heat">${cells}</div><div class="heat-cap">Rows = ${d.home} goals, columns = ${d.away} goals (% likelihood)</div>`;
+  return `<div class="hm">
+    <div class="hm-toplbl">${flag(d.away)} ${d.away} goals →</div>
+    <div class="hm-grid">${grid}</div>
+    <div class="hm-sidelbl">↓ ${flag(d.home)} ${d.home} goals</div>
+    <div class="heat-cap">Brightest cell is the most likely score — <b>${d.expected.most_likely_score}</b> at ${mx}%.</div>
+  </div>`;
 }
 function detailMarkup(fx, d) {
   const fin = fx.status === "finished";
@@ -446,13 +454,65 @@ async function refreshTeams() {
   });
 }
 
+// --- AI helper -------------------------------------------------------------
+const CHAT = [];
+function chatBubble(role, text) {
+  const wrap = document.getElementById("chat-msgs");
+  const div = document.createElement("div");
+  div.className = "chat-msg " + role;
+  div.textContent = text;
+  wrap.appendChild(div);
+  wrap.scrollTop = wrap.scrollHeight;
+  return div;
+}
+function initChat(aiEnabled) {
+  const fab = document.getElementById("chat-fab");
+  const panel = document.getElementById("chat-panel");
+  const form = document.getElementById("chat-form");
+  const input = document.getElementById("chat-input");
+  fab.addEventListener("click", () => {
+    const open = panel.hasAttribute("hidden");
+    if (open) {
+      panel.removeAttribute("hidden");
+      if (!CHAT.length) {
+        chatBubble("bot", aiEnabled
+          ? "Hi! I'm your World Cup betting assistant. Ask me things like \"who should I back in Brazil vs Morocco?\" or \"best over/under tonight?\""
+          : "I'm not switched on yet. Add an ANTHROPIC_API_KEY in your hosting settings to enable me — then I can talk through the model's tips with you.");
+      }
+      input.focus();
+    } else {
+      panel.setAttribute("hidden", "");
+    }
+  });
+  document.getElementById("chat-close").addEventListener("click", () => panel.setAttribute("hidden", ""));
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = "";
+    CHAT.push({ role: "user", content: text });
+    chatBubble("user", text);
+    const typing = chatBubble("bot typing", "…");
+    try {
+      const res = await jpost("/api/chat", { messages: CHAT });
+      typing.remove();
+      CHAT.push({ role: "assistant", content: res.reply });
+      chatBubble("bot", res.reply);
+    } catch (err) {
+      typing.remove();
+      chatBubble("bot", "Sorry, I couldn't answer that just now.");
+    }
+  });
+}
+
 // --- boot ------------------------------------------------------------------
 async function loadMeta() {
   try {
     const m = await api("/api/meta");
-    if (!m.auth_required) { const lo = document.getElementById("logout"); if (lo) lo.hidden = true; }
-    else { const lo = document.getElementById("logout"); if (lo) lo.hidden = false; }
-  } catch (e) {}
+    const lo = document.getElementById("logout");
+    if (lo) lo.hidden = !m.auth_required;
+    initChat(!!m.ai_enabled);
+  } catch (e) { initChat(false); }
 }
 (async function init() {
   try {
