@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Panini · World Cup predictions</title>
-  <link rel="stylesheet" href="/static/styles.css?v=6" />
+  <title>Predictions · World Cup</title>
+  <link rel="stylesheet" href="/static/styles.css?v=7" />
 </head>
 <body>
   <div class="layout">
     <!-- Left icon rail (FotMob-style) -->
     <nav class="rail">
-      <div class="rail-logo">⚽</div>
+      <div class="rail-logo">⚽<span class="rail-name">Predictions</span></div>
       <button class="rail-item active" data-tab="matches"><span class="ico">🗓️</span><span>Matches</span></button>
       <button class="rail-item" data-tab="tips"><span class="ico">🎯</span><span>Tips</span></button>
       <button class="rail-item" data-tab="rankings"><span class="ico">📊</span><span>Ranking</span></button>
@@ -152,10 +152,10 @@
   </div>
 
   <!-- AI helper (corner) -->
-  <button id="chat-fab" title="Ask the Panini assistant">💬</button>
+  <button id="chat-fab" title="Ask Predi AI">💬</button>
   <div id="chat-panel" hidden>
     <header class="chat-head">
-      <span>⚽ Panini assistant</span>
+      <span>🤖 Predi AI</span>
       <button id="chat-close" class="chat-x">×</button>
     </header>
     <div id="chat-msgs" class="chat-msgs"></div>
@@ -165,6 +165,6 @@
     </form>
   </div>
 
-  <script src="/static/app.js?v=6"></script>
+  <script src="/static/app.js?v=7"></script>
 </body>
 </html>

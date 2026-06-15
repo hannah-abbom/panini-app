@@ -45,6 +45,8 @@ h2, h3 { margin: 0; }
   align-items: stretch; padding: 14px 8px; gap: 4px; position: sticky; top: 0; height: 100vh;
 }
 .rail-logo { font-size: 26px; text-align: center; margin-bottom: 12px; }
+.rail-name { display: block; font-size: 10px; font-weight: 800; letter-spacing: 0.3px; margin-top: 2px; background: linear-gradient(90deg,var(--accent),var(--accent-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+@media (max-width: 860px) { .rail-name { display: none; } }
 .rail-item {
   background: transparent; border: none; color: var(--muted); cursor: pointer;
   display: flex; flex-direction: column; align-items: center; gap: 4px;

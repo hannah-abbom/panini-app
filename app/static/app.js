@@ -476,8 +476,8 @@ function initChat(aiEnabled) {
       panel.removeAttribute("hidden");
       if (!CHAT.length) {
         chatBubble("bot", aiEnabled
-          ? "Hi! I'm your World Cup betting assistant. Ask me things like \"who should I back in Brazil vs Morocco?\" or \"best over/under tonight?\""
-          : "I'm not switched on yet. Add an ANTHROPIC_API_KEY in your hosting settings to enable me — then I can talk through the model's tips with you.");
+          ? "Hi, I'm Predi AI ⚽ — your World Cup betting assistant. Ask me things like \"who should I back in Brazil vs Morocco?\" or \"best over/under tonight?\""
+          : "Hi, I'm Predi AI ⚽. I'm not switched on yet — add an ANTHROPIC_API_KEY in your hosting settings and I'll come to life to talk through the model's tips with you.");
       }
       input.focus();
     } else {

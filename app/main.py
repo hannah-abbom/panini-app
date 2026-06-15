@@ -15,7 +15,7 @@ from .data import news as news_data
 from .data import sources
 from .models import bracket, poisson, ratings, tips
 
-app = FastAPI(title="Panini", docs_url=None, redoc_url=None)
+app = FastAPI(title="Predictions", docs_url=None, redoc_url=None)
 
 
 def _effective_elo(name: str, use_form: bool) -> tuple[float, dict | None]:
@@ -69,7 +69,7 @@ class ChatRequest(BaseModel):
 @app.post("/api/chat")
 def api_chat(req: ChatRequest, _: bool = Depends(require_auth)):
     if not ai.ai_enabled():
-        return {"reply": "The AI helper isn't switched on yet. Add an "
+        return {"reply": "Predi AI isn't switched on yet. Add an "
                 "ANTHROPIC_API_KEY environment variable to enable it.",
                 "enabled": False}
     try:

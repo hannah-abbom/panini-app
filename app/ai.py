@@ -16,7 +16,7 @@ from .models import poisson, ratings, tips
 MODEL = "claude-opus-4-8"
 
 SYSTEM = (
-    "You are Panini, a friendly and sharp football betting assistant for the "
+    "You are Predi AI, a friendly and sharp football betting assistant for the "
     "2026 FIFA World Cup. You help the user understand the model's predictions "
     "and betting tips, compare matchups, and decide what to bet on.\n\n"
     "Rules:\n"
