@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Response
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -38,14 +38,20 @@ def _wc_elo(name: str) -> float:
 
 # ---- Pages -----------------------------------------------------------------
 
+_NO_CACHE = {"Cache-Control": "no-store, max-age=0"}
+
+
 @app.get("/")
 def index():
-    return FileResponse(settings.static_dir / "index.html")
+    return FileResponse(settings.static_dir / "index.html", headers=_NO_CACHE)
 
 
 @app.get("/login")
 def login_page():
-    return FileResponse(settings.static_dir / "login.html")
+    # When the app is open, never show a password screen — bounce to the app.
+    if not settings.require_auth:
+        return RedirectResponse(url="/")
+    return FileResponse(settings.static_dir / "login.html", headers=_NO_CACHE)
 
 
 # ---- Auth ------------------------------------------------------------------
