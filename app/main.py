@@ -28,6 +28,14 @@ def _effective_elo(name: str, use_form: bool) -> tuple[float, dict | None]:
     return base, info
 
 
+def _wc_elo(name: str) -> float:
+    """Rating for a World Cup fixture: base + host advantage if applicable."""
+    base = store.rating_for(name)
+    if ratings.is_host(name):
+        base += ratings.HOST_BONUS
+    return base
+
+
 # ---- Pages -----------------------------------------------------------------
 
 @app.get("/")
@@ -67,8 +75,8 @@ def api_fixtures(_: bool = Depends(require_auth)):
     enriched = []
     for fx in data["fixtures"]:
         pred = poisson.predict(fx["home"], fx["away"],
-                               store.rating_for(fx["home"]),
-                               store.rating_for(fx["away"]), neutral=True)
+                               _wc_elo(fx["home"]), _wc_elo(fx["away"]),
+                               neutral=True)
         enriched.append({**fx, "prediction": {
             "home_win": pred.result["home_win"],
             "draw": pred.result["draw"],

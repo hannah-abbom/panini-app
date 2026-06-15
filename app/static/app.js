@@ -76,7 +76,7 @@ async function loadFixtures() {
   const data = await api("/api/fixtures");
   const badge = document.getElementById("source-badge");
   if (data.live) { badge.textContent = "live · " + data.source; badge.classList.add("live"); }
-  else badge.textContent = "sample data (providers offline)";
+  else badge.textContent = data.source || "schedule";
 
   ALL_FIXTURES = data.fixtures;
   const rounds = [...new Set(data.fixtures.map((f) => f.round).filter(Boolean))];

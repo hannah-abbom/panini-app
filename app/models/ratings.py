@@ -1,81 +1,92 @@
-"""Seed Elo ratings for national teams.
+"""Elo ratings for the 48 teams at the 2026 FIFA World Cup.
 
-These are World-Football-Elo style strength ratings (eloratings.net scale),
-hand-seeded for the 2026 World Cup contenders as of mid-2026. They are a
-starting point: the engine updates them as real results come in, and you can
-edit any value here. Unknown teams fall back to DEFAULT_RATING.
+World-Football-Elo style strength ratings (eloratings.net scale), seeded for the
+2026 finals as of mid-2026. They are a starting point: the engine updates them
+as real results come in, and you can edit any value here. Unknown teams fall
+back to DEFAULT_RATING.
+
+The three host nations (USA, Mexico, Canada) play their group games at home, so
+the prediction layer adds HOST_BONUS to their effective rating for those games.
 """
 from __future__ import annotations
 
-DEFAULT_RATING = 1700.0
+DEFAULT_RATING = 1650.0
+
+# Host nations get a home-advantage bump in their own group games.
+HOST_TEAMS = {"United States", "Mexico", "Canada"}
+HOST_BONUS = 45.0
 
 SEED_RATINGS: dict[str, float] = {
-    "Argentina": 2105,
-    "France": 2080,
-    "Spain": 2070,
-    "England": 2010,
-    "Brazil": 2005,
-    "Portugal": 1995,
-    "Netherlands": 1990,
-    "Belgium": 1945,
-    "Germany": 1930,
-    "Italy": 1925,
+    "Argentina": 2100,
+    "Spain": 2080,
+    "France": 2070,
+    "Brazil": 2015,
+    "England": 2005,
+    "Portugal": 1990,
+    "Netherlands": 1980,
+    "Belgium": 1940,
+    "Germany": 1935,
     "Croatia": 1900,
-    "Uruguay": 1900,
-    "Colombia": 1880,
-    "Morocco": 1865,
-    "Switzerland": 1840,
+    "Uruguay": 1895,
+    "Colombia": 1875,
+    "Morocco": 1860,
+    "Switzerland": 1830,
     "United States": 1825,
-    "Mexico": 1820,
-    "Japan": 1815,
-    "Senegal": 1810,
-    "Denmark": 1805,
-    "Ecuador": 1790,
-    "Austria": 1785,
-    "Korea Republic": 1775,
-    "Sweden": 1770,
-    "Serbia": 1765,
-    "Ukraine": 1760,
-    "Peru": 1745,
-    "Poland": 1745,
-    "Nigeria": 1740,
-    "Australia": 1735,
+    "Norway": 1820,
+    "Japan": 1810,
+    "Mexico": 1805,
+    "Senegal": 1805,
+    "Ecuador": 1785,
+    "Austria": 1780,
+    "Korea Republic": 1770,
+    "Sweden": 1765,
     "Egypt": 1730,
-    "Turkey": 1730,
-    "Canada": 1725,
-    "Norway": 1720,
-    "Wales": 1715,
-    "Chile": 1715,
-    "Ivory Coast": 1710,
-    "Cameroon": 1705,
+    "Australia": 1730,
+    "Turkey": 1725,
+    "Canada": 1720,
+    "Ivory Coast": 1715,
     "Ghana": 1700,
-    "Tunisia": 1695,
-    "Algeria": 1695,
-    "Paraguay": 1690,
-    "Czechia": 1690,
-    "Scotland": 1685,
-    "Greece": 1680,
-    "Hungary": 1675,
-    "Romania": 1660,
-    "Costa Rica": 1655,
-    "Saudi Arabia": 1640,
     "Iran": 1700,
+    "Czechia": 1690,
+    "Algeria": 1690,
+    "Tunisia": 1690,
+    "Scotland": 1685,
+    "Paraguay": 1685,
+    "DR Congo": 1660,
+    "Bosnia and Herzegovina": 1650,
+    "South Africa": 1640,
     "Qatar": 1640,
-    "Panama": 1635,
-    "Jamaica": 1620,
+    "Saudi Arabia": 1635,
+    "Panama": 1630,
+    "Uzbekistan": 1620,
+    "Iraq": 1600,
+    "Jordan": 1580,
+    "Cape Verde": 1575,
     "New Zealand": 1560,
+    "Curacao": 1505,
+    "Haiti": 1500,
 }
 
-# Common name variants from data providers -> our canonical key.
+# Common name variants from data providers / fixtures -> our canonical key.
 ALIASES: dict[str, str] = {
     "USA": "United States",
     "US": "United States",
+    "United States of America": "United States",
     "South Korea": "Korea Republic",
     "Korea": "Korea Republic",
-    "Cote d'Ivoire": "Ivory Coast",
-    "Czech Republic": "Czechia",
+    "Korea, Republic of": "Korea Republic",
     "Turkiye": "Turkey",
-    "Turkía": "Turkey",
+    "Türkiye": "Turkey",
+    "Czech Republic": "Czechia",
+    "Cote d'Ivoire": "Ivory Coast",
+    "Côte d'Ivoire": "Ivory Coast",
+    "Congo DR": "DR Congo",
+    "DRC": "DR Congo",
+    "Democratic Republic of the Congo": "DR Congo",
+    "Curaçao": "Curacao",
+    "Bosnia & Herzegovina": "Bosnia and Herzegovina",
+    "Bosnia": "Bosnia and Herzegovina",
+    "Cabo Verde": "Cape Verde",
 }
 
 
@@ -86,3 +97,7 @@ def canonical(name: str) -> str:
 
 def rating_for(name: str) -> float:
     return SEED_RATINGS.get(canonical(name), DEFAULT_RATING)
+
+
+def is_host(name: str) -> bool:
+    return canonical(name) in HOST_TEAMS
