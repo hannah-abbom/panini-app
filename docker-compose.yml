@@ -1,0 +1,39 @@
+# Run Panini behind Caddy, which gets you automatic HTTPS (free Let's Encrypt
+# certificates) once you point a domain at the server.
+#
+#   1. Edit .env (ACCESS_PASSWORD, SECRET_KEY).
+#   2. Put your domain + email in Caddyfile.
+#   3. docker compose up -d
+#
+# For a quick local test without a domain, you can reach the app directly on
+# http://localhost:8000 (the "app" service publishes that port).
+
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - panini-data:/app/.data      # persist Elo ratings + result log
+    expose:
+      - "8000"
+    ports:
+      - "8000:8000"                 # remove this line in production (Caddy fronts it)
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  panini-data:
+  caddy-data:
+  caddy-config:

@@ -1,15 +1,15 @@
 """Match prediction engine: Elo -> expected goals -> Dixon-Coles/Poisson.
 
 Pipeline:
-  1. Turn the two teams' Elo ratings into an expected goal *supremacy*
-     (how many goals the favourite is expected to win by) and an expected
-     *total* number of goals in the match.
+  1. Turn the two teams' Elo ratings into an expected goal *supremacy* (how
+     many goals the favourite is expected to win by) and an expected *total*
+     number of goals in the match.
   2. Split those into per-team scoring rates (lambda_home, lambda_away).
   3. Build the full score matrix with independent Poissons, then apply the
      Dixon-Coles low-score correction (rho) which fixes the well-known
      under-counting of 0-0 / 1-0 / 1-1 results.
-  4. Read every market off that matrix: 1X2, double chance, over/under,
-     both-teams-to-score, correct score.
+  4. Read every market off that matrix: 1X2, double chance, over/under, BTTS,
+     clean sheets, win-to-nil, handicaps, goal distribution, correct score.
 
 A separate helper turns any probability + bookmaker odds into an edge and a
 Kelly-criterion stake, which is what makes this useful for finding value.
@@ -72,6 +72,10 @@ def _pct(x: float) -> float:
     return round(float(x) * 100.0, 1)
 
 
+def _fair_odds(p: float) -> float | None:
+    return round(1.0 / p, 2) if p > 1e-9 else None
+
+
 @dataclass
 class Prediction:
     home: str
@@ -80,10 +84,13 @@ class Prediction:
     away_elo: float
     lambda_home: float
     lambda_away: float
-    result: dict        # 1X2 + double chance probabilities
-    goals: dict         # over/under + BTTS
-    expected: dict      # expected goals + most likely / fair lines
-    correct_scores: list  # top scorelines
+    result: dict
+    goals: dict
+    markets: dict
+    expected: dict
+    correct_scores: list
+    matrix: list        # 6x6 grid (goals 0..5) in percent, for the heatmap
+    advance: dict       # knockout: probability each side goes through
 
     def to_dict(self) -> dict:
         return {
@@ -95,8 +102,11 @@ class Prediction:
             "lambda_away": round(self.lambda_away, 2),
             "result": self.result,
             "goals": self.goals,
+            "markets": self.markets,
             "expected": self.expected,
             "correct_scores": self.correct_scores,
+            "matrix": self.matrix,
+            "advance": self.advance,
         }
 
 
@@ -105,17 +115,43 @@ def predict(home: str, away: str, home_elo: float, away_elo: float,
     lam_h, lam_a = _expected_lambdas(home_elo, away_elo, neutral=neutral)
     m = score_matrix(lam_h, lam_a)
 
-    p_home = np.tril(m, -1).sum()   # home goals > away goals
-    p_away = np.triu(m, 1).sum()    # away goals > home goals
-    p_draw = np.trace(m)
+    p_home = float(np.tril(m, -1).sum())   # home goals > away goals
+    p_away = float(np.triu(m, 1).sum())    # away goals > home goals
+    p_draw = float(np.trace(m))
 
     # Over / under and BTTS read straight off the matrix.
     idx = np.add.outer(np.arange(MAX_GOALS + 1), np.arange(MAX_GOALS + 1))
     overs = {}
-    for line in (1.5, 2.5, 3.5):
-        over = m[idx > line].sum()
+    for line in (0.5, 1.5, 2.5, 3.5, 4.5):
+        over = float(m[idx > line].sum())
         overs[str(line)] = {"over": _pct(over), "under": _pct(1 - over)}
-    btts_yes = m[1:, 1:].sum()
+    btts_yes = float(m[1:, 1:].sum())
+
+    # Goal-count distribution (total goals in the match).
+    total_dist = []
+    for n in range(0, 7):
+        if n < 6:
+            p = float(m[idx == n].sum())
+        else:
+            p = float(m[idx >= 6].sum())
+        total_dist.append({"goals": (f"{n}+" if n == 6 else str(n)),
+                           "prob": _pct(p)})
+
+    # Clean sheets and win-to-nil.
+    cs_home = float(m[:, 0].sum())          # away fails to score
+    cs_away = float(m[0, :].sum())          # home fails to score
+    wtn_home = float(np.tril(m, -1)[:, 0].sum())
+    wtn_away = float(np.triu(m, 1)[0, :].sum())
+
+    # Handicaps (no push; goal lines).
+    margin = np.subtract.outer(np.arange(MAX_GOALS + 1),
+                               np.arange(MAX_GOALS + 1))
+    handicaps = {
+        "home_-1.5": _pct(float(m[margin >= 2].sum())),
+        "home_+1.5": _pct(float(m[margin >= -1].sum())),
+        "away_-1.5": _pct(float(m[margin <= -2].sum())),
+        "away_+1.5": _pct(float(m[margin <= 1].sum())),
+    }
 
     # Most likely scorelines.
     flat = [((i, j), m[i, j]) for i in range(MAX_GOALS + 1)
@@ -124,6 +160,14 @@ def predict(home: str, away: str, home_elo: float, away_elo: float,
     correct_scores = [
         {"score": f"{i}-{j}", "prob": _pct(p)} for (i, j), p in flat[:6]
     ]
+
+    # 6x6 heatmap grid (goals 0..5).
+    matrix6 = [[_pct(m[i, j]) for j in range(6)] for i in range(6)]
+
+    # Knockout: who goes through if a draw is resolved by ET / penalties.
+    es = elo.expected_score(home_elo, away_elo, home=True, neutral=neutral)
+    adv_home = p_home + p_draw * es
+    advance = {"home": _pct(adv_home), "away": _pct(1 - adv_home)}
 
     result = {
         "home_win": _pct(p_home),
@@ -139,10 +183,20 @@ def predict(home: str, away: str, home_elo: float, away_elo: float,
             "draw": _fair_odds(p_draw),
             "away": _fair_odds(p_away),
         },
+        "expected_points": {
+            "home": round(3 * p_home + p_draw, 2),
+            "away": round(3 * p_away + p_draw, 2),
+        },
     }
     goals = {
         "over_under": overs,
         "btts": {"yes": _pct(btts_yes), "no": _pct(1 - btts_yes)},
+        "distribution": total_dist,
+    }
+    markets = {
+        "clean_sheet": {"home": _pct(cs_home), "away": _pct(cs_away)},
+        "win_to_nil": {"home": _pct(wtn_home), "away": _pct(wtn_away)},
+        "handicap": handicaps,
     }
     expected = {
         "goals_home": round(lam_h, 2),
@@ -152,24 +206,33 @@ def predict(home: str, away: str, home_elo: float, away_elo: float,
         "most_likely_score": correct_scores[0]["score"],
     }
     return Prediction(home, away, home_elo, away_elo, lam_h, lam_a,
-                      result, goals, expected, correct_scores)
+                      result, goals, markets, expected, correct_scores,
+                      matrix6, advance)
 
 
-def _fair_odds(p: float) -> float | None:
-    return round(1.0 / p, 2) if p > 1e-9 else None
+def advance_probability(home_elo: float, away_elo: float,
+                        neutral: bool = True) -> float:
+    """Probability the home/first team wins a knockout tie (0..1)."""
+    lam_h, lam_a = _expected_lambdas(home_elo, away_elo, neutral=neutral)
+    m = score_matrix(lam_h, lam_a)
+    p_home = float(np.tril(m, -1).sum())
+    p_draw = float(np.trace(m))
+    es = elo.expected_score(home_elo, away_elo, home=True, neutral=neutral)
+    return p_home + p_draw * es
 
 
 def value_bet(prob_pct: float, decimal_odds: float) -> dict:
     """Edge and Kelly stake for a probability (%) against bookmaker odds."""
     p = max(0.0, min(1.0, prob_pct / 100.0))
     if decimal_odds <= 1.0:
-        return {"edge_pct": 0.0, "kelly_pct": 0.0, "value": False}
+        return {"edge_pct": 0.0, "kelly_pct": 0.0, "half_kelly_pct": 0.0,
+                "value": False, "implied_pct": 0.0}
     edge = p * decimal_odds - 1.0                       # expected return per unit
-    kelly = (p * decimal_odds - 1.0) / (decimal_odds - 1.0)
-    kelly = max(0.0, kelly)
+    kelly = max(0.0, (p * decimal_odds - 1.0) / (decimal_odds - 1.0))
     return {
         "edge_pct": round(edge * 100.0, 1),
         "kelly_pct": round(kelly * 100.0, 1),
         "half_kelly_pct": round(kelly * 50.0, 1),
+        "implied_pct": round(100.0 / decimal_odds, 1),
         "value": edge > 0.0,
     }
