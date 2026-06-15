@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Predictions · World Cup</title>
-  <link rel="stylesheet" href="/static/styles.css?v=13" />
+  <link rel="stylesheet" href="/static/styles.css?v=14" />
 </head>
 <body>
   <div class="layout">
@@ -13,6 +13,7 @@
       <div class="rail-logo">⚽<span class="rail-name">Predictions</span></div>
       <button class="rail-item active" data-tab="matches"><span class="ico">🗓️</span><span>Matches</span></button>
       <button class="rail-item" data-tab="tips"><span class="ico">🎯</span><span>Tips</span></button>
+      <button class="rail-item" data-tab="accuracy"><span class="ico">📈</span><span>Accuracy</span></button>
       <button class="rail-item" data-tab="rankings"><span class="ico">📊</span><span>Ranking</span></button>
       <button class="rail-item" data-tab="news"><span class="ico">📰</span><span>News</span></button>
       <button class="rail-item" data-tab="matchup"><span class="ico">⚔️</span><span>Matchup</span></button>
@@ -62,6 +63,17 @@
             <button id="acca-clear" class="ghost">Clear</button>
           </div>
           <div id="tips-board" class="tips-board"></div>
+        </div>
+      </section>
+
+      <!-- ACCURACY -->
+      <section id="tab-accuracy" class="panel">
+        <div class="pad">
+          <h2 class="ph">AI accuracy</h2>
+          <p class="hint">How the model's pre-match predictions compare to what actually happened — a live, honest walk-forward backtest that updates as games finish.</p>
+          <div id="accuracy-cards" class="acc-cards"></div>
+          <h3 class="section-title">Predicted vs actual</h3>
+          <div id="accuracy-log" class="acc-log"></div>
         </div>
       </section>
 
@@ -168,6 +180,6 @@
     </form>
   </div>
 
-  <script src="/static/app.js?v=13"></script>
+  <script src="/static/app.js?v=14"></script>
 </body>
 </html>

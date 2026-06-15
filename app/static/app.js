@@ -220,6 +220,18 @@ function marketsMarkup(fx, d) {
   </div>`;
 }
 const stars = (n) => "★★★".slice(0, n) + "☆☆☆".slice(0, 3 - n);
+function tickCountdowns() {
+  document.querySelectorAll(".dt-countdown[data-kick]").forEach((el) => {
+    const t = new Date(el.dataset.kick).getTime() - Date.now();
+    if (isNaN(t)) { el.textContent = ""; return; }
+    if (t <= 0) { el.textContent = "⏱ kicking off"; return; }
+    const d = Math.floor(t / 864e5), h = Math.floor(t % 864e5 / 36e5);
+    const m = Math.floor(t % 36e5 / 6e4), s = Math.floor(t % 6e4 / 1000);
+    el.textContent = d > 0 ? `⏱ kicks off in ${d}d ${h}h ${m}m`
+      : `⏱ kicks off in ${h}h ${String(m).padStart(2, "0")}m ${String(s).padStart(2, "0")}s`;
+  });
+}
+setInterval(tickCountdowns, 1000);
 function statBlock(name, s, unit) {
   const lines = Object.entries(s.lines || {}).map(([l, v]) =>
     `<div class="row"><span>Over ${l}</span><b>${v.over}%</b></div>`).join("");
@@ -275,7 +287,7 @@ function detailMarkup(fx, d) {
     ? `<div class="dt-score">${fx.score}</div><div class="dt-ft livenow">● LIVE</div><div class="dt-status">${fx.round}</div>`
     : fin
     ? `<div class="dt-score">${fx.score}</div><div class="dt-ft">FULL TIME</div><div class="dt-status">${fx.round}</div>`
-    : `<div class="dt-time">${fmtTime(fx.utc_date)}</div><div class="dt-status">${fmtDay(fx.utc_date)} · ${fx.round}</div>`;
+    : `<div class="dt-time">${fmtTime(fx.utc_date)}</div><div class="dt-countdown" data-kick="${fx.utc_date}"></div><div class="dt-status">${fmtDay(fx.utc_date)} · ${fx.round}</div>`;
   const fo = d.result.fair_odds;
   return `
     <div class="dt-head" style="--ch:${teamColor(fx.home)};--ca:${teamColor(fx.away)}">
@@ -404,6 +416,34 @@ async function loadTips() {
     btn.addEventListener("click", () => accaToggle(btn.dataset.key, btn.dataset.label, parseFloat(btn.dataset.odds)));
   });
   accaRefresh();
+}
+
+// --- AI accuracy -----------------------------------------------------------
+async function loadAccuracy() {
+  let d;
+  try { d = await api("/api/accuracy"); } catch (e) { return; }
+  const s = d.summary, cards = document.getElementById("accuracy-cards");
+  const log = document.getElementById("accuracy-log");
+  if (!s.matches) {
+    cards.innerHTML = "<p class='hint'>No finished matches yet — accuracy appears once games are played.</p>";
+    log.innerHTML = ""; return;
+  }
+  cards.innerHTML = [
+    ["Result accuracy", s.result_accuracy + "%", "1X2 winner called right"],
+    ["Exact score", s.score_accuracy + "%", "correct scoreline"],
+    ["Over/Under 2.5", s.over_under_accuracy + "%", "goals line right"],
+    ["Both teams score", s.btts_accuracy + "%", "BTTS called right"],
+    ["Avg confidence", s.avg_confidence + "%", "in the actual outcome"],
+    ["Matches graded", s.matches, "finished so far"],
+  ].map(([t, v, sub]) => `<div class="acc-card"><div class="acc-val" data-c>${v}</div><div class="acc-t">${t}</div><div class="acc-sub">${sub}</div></div>`).join("");
+  log.innerHTML = d.log.map((r) => `
+    <div class="acc-row ${r.hit ? "hit" : "miss"}">
+      <span class="acc-m">${flag(r.home)} ${r.home} <i>v</i> ${r.away} ${flag(r.away)}</span>
+      <span class="acc-pred">pred <b>${r.predicted}</b> · ${r.pred_score}</span>
+      <span class="acc-act">actual <b>${r.actual}</b></span>
+      <span class="acc-mark">${r.hit ? "✓" : "✗"}</span>
+    </div>`).join("");
+  cards.querySelectorAll(".acc-val[data-c]").forEach(countUp);
 }
 
 // --- news ------------------------------------------------------------------
@@ -623,7 +663,7 @@ async function loadMeta() {
   try {
     await loadMeta();
     await loadTeams();
-    await Promise.all([loadFixtures(), loadTips(), loadRankings(), loadResultsLog(), loadNews()]);
+    await Promise.all([loadFixtures(), loadTips(), loadAccuracy(), loadRankings(), loadResultsLog(), loadNews()]);
     renderBracketPicks(8);
     startLivePolling();
   } catch (e) { /* 401 redirected */ }

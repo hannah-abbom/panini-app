@@ -304,6 +304,28 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
 .chat-form input { flex: 1; }
 .chat-form button { width: 44px; padding: 0; font-size: 18px; }
 
+/* Kickoff countdown */
+.dt-countdown { color: var(--accent); font-size: 12px; font-weight: 700; margin-top: 4px; }
+
+/* AI accuracy dashboard */
+.acc-cards { display: grid; grid-template-columns: repeat(auto-fill,minmax(170px,1fr)); gap: 13px; max-width: 1080px; }
+.acc-card { background: radial-gradient(130% 130% at 0% 0%, rgba(31,224,140,0.10), transparent 55%), var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 18px; }
+.acc-val { font-size: 30px; font-weight: 800; letter-spacing: -0.5px; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.acc-t { font-weight: 700; margin-top: 6px; font-size: 14px; }
+.acc-sub { color: var(--muted); font-size: 11.5px; margin-top: 2px; }
+.acc-log { display: flex; flex-direction: column; gap: 6px; max-width: 920px; }
+.acc-row { display: grid; grid-template-columns: 1.5fr 1.2fr 0.9fr 28px; align-items: center; gap: 12px; background: var(--panel); border: 1px solid var(--border); border-left: 3px solid var(--muted-2); border-radius: 11px; padding: 11px 15px; font-size: 13.5px; }
+.acc-row.hit { border-left-color: var(--accent); } .acc-row.miss { border-left-color: var(--red); }
+.acc-row .acc-m { font-weight: 600; } .acc-row .acc-m i { color: var(--muted); font-style: normal; }
+.acc-row .acc-pred, .acc-row .acc-act { color: var(--muted); }
+.acc-row b { color: var(--text); }
+.acc-row .acc-mark { text-align: center; font-weight: 800; font-size: 16px; }
+.acc-row.hit .acc-mark { color: var(--accent); } .acc-row.miss .acc-mark { color: var(--red); }
+@media (max-width: 680px) { .acc-row { grid-template-columns: 1fr auto; } .acc-pred, .acc-act { grid-column: 1; } }
+
+/* Glassmorphism accents */
+.bod, .dt-head { backdrop-filter: blur(6px); }
+
 /* ---- Light theme ---- */
 body.light {
   --bg: #eef1f7; --bg-2: #e6eaf2; --rail: #ffffff; --panel: #ffffff;
@@ -327,15 +349,28 @@ body.light button { color: #04130a; }
 
 /* ---- Responsive ---- */
 @media (max-width: 880px) {
-  .rail { width: 100%; flex: none; height: auto; position: sticky; flex-direction: row; justify-content: space-around; padding: 7px; border-right: none; border-bottom: 1px solid var(--border); }
-  .rail-logo, .rail-spacer { display: none; }
-  .rail-name { display: none; }
-  .rail-item span:not(.ico) { display: none; }
-  .rail-item.active::before { display: none; }
   .layout { flex-direction: column; }
+  /* Native-style bottom tab bar */
+  .rail { position: fixed; bottom: 0; left: 0; right: 0; top: auto; width: 100%; height: auto;
+    flex-direction: row; justify-content: space-between; gap: 0; overflow-x: auto;
+    padding: 6px 4px max(6px, env(safe-area-inset-bottom)); border-right: none;
+    border-top: 1px solid var(--border); background: rgba(8,11,17,0.92); backdrop-filter: blur(16px); z-index: 70; }
+  body.light .rail { background: rgba(255,255,255,0.92); }
+  .rail-logo, .rail-spacer { display: none; }
+  .rail-item { flex: 1 0 auto; padding: 7px 8px; border-radius: 10px; }
+  .rail-item span:not(.ico) { font-size: 9px; }
+  .rail-item.active::before { display: none; }
+  .content { padding-bottom: 80px; }
   #tab-matches.panel.active { flex-direction: column; }
-  .col-list { width: 100%; flex: none; height: auto; border-right: none; }
-  .col-detail { height: auto; }
-  #chat-panel { right: 10px; bottom: 80px; }
-  #chat-fab { right: 16px; bottom: 70px; }
+  .col-list { width: 100%; flex: none; height: auto; border-right: none; padding: 14px; }
+  .col-detail { height: auto; padding: 14px; }
+  .pad { padding: 18px 16px 96px; }
+  .tips-board, .newslist, .acc-cards { grid-template-columns: 1fr 1fr; }
+  #chat-panel { right: 8px; left: 8px; width: auto; bottom: 88px; height: min(68vh, 520px); }
+  #chat-fab { right: 16px; bottom: 88px; }
+}
+@media (max-width: 520px) {
+  .tips-board, .newslist, .acc-cards { grid-template-columns: 1fr; }
+  .dt-team .dt-flag { font-size: 40px; }
+  .dt-center .dt-time { font-size: 24px; }
 }

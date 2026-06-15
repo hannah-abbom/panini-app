@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import ai, store
+from . import accuracy, ai, store
 from .auth import (COOKIE_NAME, SESSION_TTL_SECONDS, check_password,
                    issue_token, require_auth)
 from .config import settings
@@ -218,6 +218,11 @@ def _tier(elo: float) -> str:
 @app.get("/api/news")
 def api_news(_: bool = Depends(require_auth)):
     return {"items": news_data.get_news()}
+
+
+@app.get("/api/accuracy")
+def api_accuracy(_: bool = Depends(require_auth)):
+    return accuracy.compute()
 
 
 @app.get("/api/teams")
