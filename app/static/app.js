@@ -529,14 +529,31 @@ async function refreshTeams() {
 
 // --- AI helper -------------------------------------------------------------
 const CHAT = [];
+const escHtml = (s) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+const fmtMsg = (s) => escHtml(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
 function chatBubble(role, text) {
   const wrap = document.getElementById("chat-msgs");
   const div = document.createElement("div");
   div.className = "chat-msg " + role;
-  div.textContent = text;
+  if (role === "bot") div.innerHTML = fmtMsg(text); else div.textContent = text;
   wrap.appendChild(div);
   wrap.scrollTop = wrap.scrollHeight;
   return div;
+}
+function addChips() {
+  const wrap = document.getElementById("chat-msgs");
+  const div = document.createElement("div");
+  div.className = "chat-chips";
+  ["Best bets", "Build me an acca", "Value picks", "Brazil vs Morocco", "Group H"].forEach((c) => {
+    const b = document.createElement("button");
+    b.className = "chat-chip"; b.type = "button"; b.textContent = c;
+    b.addEventListener("click", () => {
+      document.getElementById("chat-input").value = c;
+      document.getElementById("chat-form").requestSubmit();
+    });
+    div.appendChild(b);
+  });
+  wrap.appendChild(div);
 }
 function initChat(aiEnabled) {
   const fab = document.getElementById("chat-fab");
@@ -548,8 +565,9 @@ function initChat(aiEnabled) {
     if (open) {
       panel.removeAttribute("hidden");
       if (!CHAT.length) {
-        chatBubble("bot", "Hi, I'm Predi AI ⚽ — your World Cup betting assistant. Ask me about any match (\"Brazil vs Morocco\"), the \"best bets\", corners, cards or goals."
-          + (aiEnabled ? "" : " (Running in quick mode — add an ANTHROPIC_API_KEY for smarter, conversational answers.)"));
+        chatBubble("bot", "Hi, I'm **Predi AI** ⚽ — your World Cup betting assistant. Ask me for the **best bets**, a match prediction, an accumulator, or tap a suggestion below."
+          + (aiEnabled ? "" : ""));
+        addChips();
       }
       input.focus();
     } else {

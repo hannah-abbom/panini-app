@@ -81,6 +81,7 @@ def _structured() -> list[dict]:
                 "date": fx["utc_date"][:10], "r": pred["result"],
                 "goals": pred["goals"], "stats": pred["stats"],
                 "exp": pred["expected"], "tip": tips.best_tip(pred),
+                "picks": tips.top_picks(pred, 3),
             })
         return rows
     return cache.get_or_fetch("ai_structured", build, ttl_minutes=15)
@@ -102,57 +103,157 @@ def _teams_in(text: str) -> list[str]:
     return found
 
 
-def _answer_match(r: dict, focus: str | None = None) -> str:
+def _upcoming(rows):
+    return [r for r in rows if r["status"] not in ("finished", "live")]
+
+
+def _answer_match(r: dict) -> str:
     if r["status"] == "finished":
-        return f"{r['home']} {r['score']} {r['away']} — full time."
-    res, tip, exp, g, st = r["r"], r["tip"], r["exp"], r["goals"], r["stats"]
-    live = " (LIVE now: " + str(r["score"]) + ")" if r["status"] == "live" else ""
-    return "\n".join([
-        f"{r['home']} vs {r['away']}{live}:",
-        f"• Win chance — {r['home']} {res['home_win']}%, draw {res['draw']}%, {r['away']} {res['away_win']}%",
-        f"• Likely score {exp['most_likely_score']}, ~{exp['total']} goals · over 2.5 {g['over_under']['2.5']['over']}% · BTTS {g['btts']['yes']}%",
+        return f"**{r['home']} {r['score']} {r['away']}** — full time."
+    res, exp, g, st = r["r"], r["exp"], r["goals"], r["stats"]
+    live = f" (🔴 LIVE: {r['score']})" if r["status"] == "live" else ""
+    picks = r.get("picks", [r["tip"]])
+    lines = [
+        f"**{r['home']} vs {r['away']}**{live}",
+        f"• Win chance — {r['home']} **{res['home_win']}%**, draw {res['draw']}%, {r['away']} **{res['away_win']}%**",
+        f"• Likely score **{exp['most_likely_score']}** · ~{exp['total']} goals · over 2.5 {g['over_under']['2.5']['over']}% · BTTS {g['btts']['yes']}%",
         f"• Corners ~{st['corners']['total']} · cards ~{st['cards']['total']}",
-        f"🎯 Best bet: {tip['selection']} @ {tip['odds']} ({tip['confidence']} confidence). Model estimate — bet responsibly.",
-    ])
+        "🎯 Best bets:",
+    ]
+    lines += [f"• **{p['selection']}** @ {p['odds']} ({p['prob']}%)" for p in picks[:3]]
+    lines.append("\nModel estimates — bet responsibly.")
+    return "\n".join(lines)
 
 
-def _top_tips(rows, key=None, n=5) -> str:
-    up = [r for r in rows if r["status"] not in ("finished", "live")]
-    if key:
-        up.sort(key=lambda r: -key(r))
-    else:
-        up.sort(key=lambda r: (-r["tip"]["stars"], -r["tip"]["prob"]))
-    lines = ["🎯 Top picks right now:"]
+def _top_tips(rows, key=None, n=5, title="🎯 Top picks right now:") -> str:
+    up = _upcoming(rows)
+    up.sort(key=key if key else (lambda r: (-r["tip"]["stars"], -r["tip"]["prob"])))
+    lines = [title]
     for r in up[:n]:
-        lines.append(f"• {r['home']} v {r['away']} — {r['tip']['selection']} @ {r['tip']['odds']}")
+        lines.append(f"• {r['home']} v {r['away']} — **{r['tip']['selection']}** @ {r['tip']['odds']}")
     lines.append("\nModel estimates only — bet responsibly.")
     return "\n".join(lines)
 
 
+def _all_picks(rows):
+    out = []
+    for r in _upcoming(rows):
+        for p in r.get("picks", [r["tip"]]):
+            out.append((r, p))
+    return out
+
+
+def _pick_list(title, items, n=6) -> str:
+    lines, seen = [title], set()
+    for r, p in items:
+        k = (r["home"], r["away"], p["selection"])
+        if k in seen:
+            continue
+        seen.add(k)
+        lines.append(f"• {r['home']} v {r['away']} — **{p['selection']}** @ {p['odds']} ({p['prob']}%)")
+        if len(seen) >= n:
+            break
+    lines.append("\nModel estimates — bet responsibly.")
+    return "\n".join(lines)
+
+
+def _acca(rows, n) -> str:
+    n = max(2, min(6, n or 3))
+    picks = sorted(_upcoming(rows), key=lambda r: (-r["tip"]["stars"], -r["tip"]["prob"]))[:n]
+    comb = 1.0
+    for r in picks:
+        comb *= r["tip"]["odds"]
+    comb = round(comb, 2)
+    lines = [f"Here's a **{len(picks)}-fold accumulator**:"]
+    lines += [f"• {r['home']} v {r['away']} — **{r['tip']['selection']}** @ {r['tip']['odds']}" for r in picks]
+    lines.append(f"\nCombined odds **{comb}** — a £10 stake returns **£{round(comb * 10, 2)}**.")
+    lines.append("Build it leg-by-leg on the Tips tab. More legs = bigger payout, lower chance. Bet responsibly.")
+    return "\n".join(lines)
+
+
+def _group(rows, letter) -> str:
+    g = f"Group {letter.upper()}"
+    grows = [r for r in rows if r["round"] == g]
+    if not grows:
+        return f"I couldn't find {g}."
+    teams = sorted({r["home"] for r in grows} | {r["away"] for r in grows},
+                   key=lambda t: -store.rating_for(t))
+    lines = [f"**{g}** — model order:"]
+    lines += [f"{i}. {t}" for i, t in enumerate(teams, 1)]
+    up = _upcoming(grows)
+    if up:
+        lines.append("\nUpcoming picks:")
+        lines += [f"• {r['home']} v {r['away']} — **{r['tip']['selection']}** @ {r['tip']['odds']}" for r in up[:6]]
+    return "\n".join(lines)
+
+
+def _favourites() -> str:
+    rated = sorted(store.all_ratings().items(), key=lambda kv: -kv[1])[:6]
+    lines = ["🏆 Title favourites by the model:"]
+    lines += [f"{i}. {t} ({round(e)})" for i, (t, e) in enumerate(rated, 1)]
+    return "\n".join(lines)
+
+
+_HELP = ("I'm **Predi AI** ⚽ — here's what I can do:\n"
+         "• **best bets** — the strongest tips right now\n"
+         "• **build me an acca** (or \"4-fold\") — a ready accumulator\n"
+         "• **value picks** or **safest picks**\n"
+         "• **Brazil vs Morocco** — a full match prediction\n"
+         "• **most corners / cards / goals**\n"
+         "• **Group H** — group order + picks\n"
+         "• **who will win the World Cup**\n"
+         "Just ask away!")
+
+
 def local_answer(message: str) -> str:
     """Rule-based answer from the model — works with no API key."""
-    low = (message or "").lower()
+    msg = message or ""
+    low = msg.lower().strip()
     rows = _structured()
-    if not low.strip():
-        return "Hi! Ask me about any match (e.g. \"Brazil vs Morocco\") or say \"best bets\"."
+    if not low:
+        return _HELP
+    if low in ("hi", "hello", "hey", "yo", "sup") or low.startswith(("hi ", "hello", "hey")):
+        return "Hey! ⚽ I'm **Predi AI**. Ask me for the **best bets**, a prediction like **Brazil vs Morocco**, or say **build me an acca**."
+    if "thank" in low:
+        return "Anytime — good luck! 🍀 Ask me for more whenever you like."
+    if "help" in low or "what can you" in low:
+        return _HELP
 
     if "live" in low:
         liv = [r for r in rows if r["status"] == "live"]
         if liv:
-            return "Live now:\n" + "\n".join(f"• {r['home']} {r['score']} {r['away']}" for r in liv)
+            return "🔴 Live now:\n" + "\n".join(f"• {r['home']} **{r['score']}** {r['away']}" for r in liv)
         return "No World Cup games are live right now — check the Matches tab for kickoff times."
 
+    if any(k in low for k in ("acca", "accumulator", "parlay", "fold", "multi", "combo")):
+        m = re.search(r"\b(\d+)\b", low)
+        return _acca(rows, int(m.group(1)) if m else 3)
+    if any(k in low for k in ("value", "longshot", "long shot", "upset", "underdog")):
+        items = sorted([(r, p) for (r, p) in _all_picks(rows) if p["odds"] >= 1.7],
+                       key=lambda rp: -rp[1]["prob"])
+        return _pick_list("💎 Value picks (bigger odds the model still rates):", items)
+    if any(k in low for k in ("safe", "banker", "sure", "confident", "most likely")):
+        items = sorted(_all_picks(rows), key=lambda rp: -rp[1]["prob"])
+        return _pick_list("🛡️ Safest picks (highest model confidence):", items)
+    if any(k in low for k in ("win the world cup", "champion", "favourite", "favorite",
+                              "win it all", "lift the", "tournament winner")):
+        return _favourites()
+
+    gm = re.search(r"group ([a-l])\b", low)
+    if gm:
+        return _group(rows, gm.group(1))
+
     if any(k in low for k in ("best bet", "best bets", "bet of the day", "top tip",
-                              "best tip", "good bet", "what should i bet", "tips")):
+                              "best tip", "good bet", "what should i bet", "tips", "recommend")):
         return _top_tips(rows)
     if "corner" in low:
-        return _top_tips(rows, key=lambda r: r["stats"]["corners"]["total"])
+        return _top_tips(rows, key=lambda r: -r["stats"]["corners"]["total"], title="⛳ Most corners expected:")
     if "card" in low:
-        return _top_tips(rows, key=lambda r: r["stats"]["cards"]["total"])
-    if "over" in low or "goals" in low:
-        return _top_tips(rows, key=lambda r: r["goals"]["over_under"]["2.5"]["over"])
+        return _top_tips(rows, key=lambda r: -r["stats"]["cards"]["total"], title="🟨 Most cards expected:")
+    if "over" in low or "goal" in low:
+        return _top_tips(rows, key=lambda r: -r["goals"]["over_under"]["2.5"]["over"], title="⚽ Most goals expected:")
 
-    teams = _teams_in(message)
+    teams = _teams_in(msg)
     if len(teams) >= 2:
         for r in rows:
             if {ratings.canonical(r["home"]), ratings.canonical(r["away"])} == {teams[0], teams[1]}:
@@ -162,15 +263,14 @@ def local_answer(message: str) -> str:
         return _answer_match({"home": h, "away": a, "status": "upcoming",
                               "r": pred["result"], "goals": pred["goals"],
                               "stats": pred["stats"], "exp": pred["expected"],
-                              "tip": tips.best_tip(pred)})
+                              "tip": tips.best_tip(pred), "picks": tips.top_picks(pred, 3)})
     if len(teams) == 1:
         for r in rows:
             if teams[0] in (ratings.canonical(r["home"]), ratings.canonical(r["away"])):
                 return _answer_match(r)
         return f"I couldn't find a fixture for {teams[0]}. Try two teams, e.g. \"Spain vs Cape Verde\"."
 
-    return ("I can talk through any match or the best bets. Try \"best bets\", "
-            "\"Brazil vs Morocco\", or \"who wins Spain's game?\"\n\n" + _top_tips(rows, n=3))
+    return "I didn't quite catch that. " + _HELP
 
 
 def chat(history: list[dict]) -> str:
