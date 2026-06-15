@@ -5,10 +5,9 @@ feeds in every environment, so the model derives expectations from the same
 inputs as the goal model (each team's expected goals + Elo) anchored to real
 World Cup baselines:
 
-  * ~9.6 corners per game        (FootyStats / corner-stats, recent World Cups)
-  * ~24 fouls per game
-  * ~4.0 yellow cards per game
-  * ~32% of shots on target are scored; ~35% of shots are on target
+All baselines below are measured from real StatsBomb event data (World Cup 2022
++ Euro 2024 sample): ~9.1 corners, ~27.3 fouls, ~3.35 yellow cards per game;
+~34% of shots land on target and ~30.6% of those are scored.
 
 The logic: shots on target scale with expected goals; corners with attacking
 dominance; fouls and cards fall more on the side defending against the stronger
@@ -19,11 +18,11 @@ from __future__ import annotations
 
 import math
 
-TOTAL_CORNERS_BASE = 9.6
-TOTAL_FOULS_BASE = 23.5
-TOTAL_CARDS_BASE = 4.0
-SOT_CONVERSION = 0.32      # goals per shot on target
-SOT_SHARE_OF_SHOTS = 0.35  # share of shots that are on target
+TOTAL_CORNERS_BASE = 9.1    # StatsBomb event data
+TOTAL_FOULS_BASE = 27.3     # StatsBomb event data
+TOTAL_CARDS_BASE = 3.35     # StatsBomb event data (yellow cards/game)
+SOT_CONVERSION = 0.306      # goals per shot on target (StatsBomb)
+SOT_SHARE_OF_SHOTS = 0.34   # share of shots that are on target (StatsBomb)
 
 
 def _pois_over(mean: float, line: float) -> float:
