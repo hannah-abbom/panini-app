@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Predictions · World Cup</title>
-  <link rel="stylesheet" href="/static/styles.css?v=11" />
+  <link rel="stylesheet" href="/static/styles.css?v=12" />
 </head>
 <body>
   <div class="layout">
@@ -18,7 +18,6 @@
       <button class="rail-item" data-tab="matchup"><span class="ico">⚔️</span><span>Matchup</span></button>
       <button class="rail-item" data-tab="knockout"><span class="ico">🏆</span><span>Knockout</span></button>
       <button class="rail-item" data-tab="value"><span class="ico">💰</span><span>Value</span></button>
-      <button class="rail-item" data-tab="results"><span class="ico">📝</span><span>Results</span></button>
       <div class="rail-spacer"></div>
       <button id="theme-toggle" class="rail-item"><span class="ico">🌙</span><span>Theme</span></button>
       <button id="logout" class="rail-item" hidden><span class="ico">↩︎</span><span>Log out</span></button>
@@ -54,7 +53,7 @@
       <section id="tab-tips" class="panel">
         <div class="pad">
           <h2 class="ph">Betting tips</h2>
-          <p class="hint">The model's strongest sensible selection for every upcoming match, ranked by confidence. Build an accumulator from your picks.</p>
+          <p class="hint">The model's three strongest bets for every upcoming match, ranked by confidence. Tap any pick to build an accumulator.</p>
           <div id="bet-of-day"></div>
           <div class="acca-bar">
             <span>Accumulator: <b id="acca-count">0</b> legs · combined odds <b id="acca-odds">1.00</b></span>
@@ -169,6 +168,6 @@
     </form>
   </div>
 
-  <script src="/static/app.js?v=11"></script>
+  <script src="/static/app.js?v=12"></script>
 </body>
 </html>

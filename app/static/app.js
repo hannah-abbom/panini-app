@@ -357,7 +357,7 @@ function accaRefresh() {
   document.getElementById("acca-count").textContent = ACCA.length;
   document.getElementById("acca-odds").textContent = combined.toFixed(2);
   document.getElementById("acca-return").textContent = (combined * stake).toFixed(2);
-  document.querySelectorAll(".tip-add").forEach((b) => {
+  document.querySelectorAll(".bc-pick").forEach((b) => {
     b.classList.toggle("on", ACCA.some((l) => l.key === b.dataset.key));
   });
 }
@@ -383,16 +383,24 @@ async function loadTips() {
   }
   const board = document.getElementById("tips-board");
   board.innerHTML = data.tips.map((b) => {
-    const key = b.id, label = `${b.home}-${b.away}: ${b.tip.selection}`;
-    return `<div class="tip-row c${b.tip.stars}">
-      <div class="tip-mtch"><span>${flag(b.home)} ${b.home} v ${b.away} ${flag(b.away)}</span><span class="tip-grp">${b.round} · ${fmtDay(b.utc_date)}</span></div>
-      <div class="tip-sel">${b.tip.selection}</div>
-      <div class="tip-meta">${stars(b.tip.stars)} ${b.tip.prob}%</div>
-      <div class="tip-od">@ ${b.tip.odds}</div>
-      <button class="tip-add" data-key="${key}" data-label="${label}" data-odds="${b.tip.odds}">＋ acca</button>
+    const r = b.result || { home_win: 0, draw: 0, away_win: 0 };
+    const picks = (b.picks && b.picks.length ? b.picks : [b.tip]).map((p) => {
+      const key = `${b.id}|${p.selection}`;
+      return `<button class="bc-pick c${p.stars}" data-key="${key}" data-label="${b.home}-${b.away}: ${p.selection}" data-odds="${p.odds}">
+        <span class="bcp-sel">${p.selection} ${stars(p.stars)}</span>
+        <span class="bcp-od">@ ${p.odds}</span></button>`;
+    }).join("");
+    return `<div class="bet-card c${b.tip.stars}">
+      <div class="bc-top">
+        <span class="bc-teams">${flag(b.home)} ${b.home} <i>v</i> ${b.away} ${flag(b.away)}</span>
+        <span class="bc-when">${b.round} · ${fmtDay(b.utc_date)}</span>
+      </div>
+      <div class="bc-bar"><i class="s-h" style="width:${r.home_win}%"></i><i class="s-d" style="width:${r.draw}%"></i><i class="s-a" style="width:${r.away_win}%"></i></div>
+      <div class="bc-prob"><span>${b.home} ${r.home_win}%</span><span>Draw ${r.draw}%</span><span>${b.away} ${r.away_win}%</span></div>
+      <div class="bc-picks">${picks}</div>
     </div>`;
   }).join("");
-  board.querySelectorAll(".tip-add").forEach((btn) => {
+  board.querySelectorAll(".bc-pick").forEach((btn) => {
     btn.addEventListener("click", () => accaToggle(btn.dataset.key, btn.dataset.label, parseFloat(btn.dataset.odds)));
   });
   accaRefresh();

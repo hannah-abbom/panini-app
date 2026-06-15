@@ -103,6 +103,7 @@ PLAYED_RESULTS: list[tuple[str, str, int, int]] = [
     ("Netherlands", "Japan", 2, 2),
     ("Ivory Coast", "Ecuador", 1, 0),
     ("Sweden", "Tunisia", 5, 1),
+    ("Spain", "Cape Verde", 0, 0),
 ]
 
 _RESULT_MAP = {(h, a): (gh, ga) for h, a, gh, ga in PLAYED_RESULTS}

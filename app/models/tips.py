@@ -67,6 +67,20 @@ def best_tip(d: dict) -> dict:
     return {**best, "confidence": conf, "stars": stars}
 
 
+def top_picks(d: dict, n: int = 3) -> list[dict]:
+    """The n strongest distinct bettable selections for a match."""
+    ranked = sorted(candidates(d), key=_score, reverse=True)
+    out: list[dict] = []
+    for c in ranked:
+        if any(p["selection"] == c["selection"] for p in out):
+            continue
+        conf, stars = _confidence(c["prob"])
+        out.append({**c, "confidence": conf, "stars": stars})
+        if len(out) >= n:
+            break
+    return out
+
+
 def match_accumulator(d: dict) -> dict:
     """A 2-leg same-match acca (result + a goals/stat leg) with combined odds."""
     cands = {c["selection"]: c for c in candidates(d)}

@@ -157,6 +157,8 @@ def _build_tips():
         board.append({
             "id": fx["id"], "home": fx["home"], "away": fx["away"],
             "round": fx["round"], "utc_date": fx["utc_date"], "tip": tip,
+            "picks": tips.top_picks(pred, 3),
+            "result": pred["result"],
             "acca": tips.match_accumulator(pred),
         })
     board.sort(key=lambda b: (-b["tip"]["stars"], -b["tip"]["prob"]))
