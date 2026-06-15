@@ -8,81 +8,88 @@ async function api(path, opts = {}) {
   return res.json();
 }
 const jpost = (path, body) => api(path, {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify(body),
+  method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
 });
-function fmtDate(v) {
+function fmtTime(v) {
   if (!v) return "";
   const d = typeof v === "number" ? new Date(v * 1000) : new Date(v);
   if (isNaN(d)) return v;
-  return d.toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+}
+function fmtDay(v) {
+  const d = new Date(v); if (isNaN(d)) return "";
+  return d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
 }
 function heatColor(p) {
-  // p is a percent 0..~40; map to a blue->green ramp.
   const t = Math.min(1, p / 22);
-  const r = Math.round(20 + t * 10), g = Math.round(40 + t * 150), b = Math.round(90 - t * 40);
-  return `rgb(${r},${g},${b})`;
+  return `rgb(${Math.round(20 + t * 10)},${Math.round(40 + t * 150)},${Math.round(90 - t * 40)})`;
 }
 function formLine(str) {
   if (!str) return "";
   return `<span class="formline">${[...str].map((c) => `<span class="f-${c}">${c}</span>`).join("")}</span>`;
 }
 
-// --- state -----------------------------------------------------------------
-let TEAMS = [];
-let ALL_FIXTURES = [];
+const FLAGS = {
+  "Argentina":"🇦🇷","Spain":"🇪🇸","France":"🇫🇷","Brazil":"🇧🇷","England":"🏴󠁧󠁢󠁥󠁮󠁧󠁿","Portugal":"🇵🇹",
+  "Netherlands":"🇳🇱","Belgium":"🇧🇪","Germany":"🇩🇪","Croatia":"🇭🇷","Uruguay":"🇺🇾","Colombia":"🇨🇴",
+  "Morocco":"🇲🇦","Switzerland":"🇨🇭","United States":"🇺🇸","USA":"🇺🇸","Norway":"🇳🇴","Japan":"🇯🇵",
+  "Mexico":"🇲🇽","Senegal":"🇸🇳","Ecuador":"🇪🇨","Austria":"🇦🇹","Korea Republic":"🇰🇷","South Korea":"🇰🇷",
+  "Sweden":"🇸🇪","Egypt":"🇪🇬","Australia":"🇦🇺","Turkey":"🇹🇷","Turkiye":"🇹🇷","Canada":"🇨🇦",
+  "Ivory Coast":"🇨🇮","Ghana":"🇬🇭","Iran":"🇮🇷","Czechia":"🇨🇿","Algeria":"🇩🇿","Tunisia":"🇹🇳",
+  "Scotland":"🏴󠁧󠁢󠁳󠁣󠁴󠁿","Paraguay":"🇵🇾","DR Congo":"🇨🇩","Bosnia and Herzegovina":"🇧🇦","South Africa":"🇿🇦",
+  "Qatar":"🇶🇦","Saudi Arabia":"🇸🇦","Panama":"🇵🇦","Uzbekistan":"🇺🇿","Iraq":"🇮🇶","Jordan":"🇯🇴",
+  "Cape Verde":"🇨🇻","New Zealand":"🇳🇿","Curacao":"🇨🇼","Haiti":"🇭🇹",
+};
+const flag = (n) => FLAGS[n] || "🏳️";
 
-// --- tabs ------------------------------------------------------------------
-document.querySelectorAll(".tab").forEach((btn) => {
+// --- state -----------------------------------------------------------------
+let TEAMS = [], ALL_FIXTURES = [], SELECTED = null;
+
+// --- nav -------------------------------------------------------------------
+document.querySelectorAll(".rail-item[data-tab]").forEach((btn) => {
   btn.addEventListener("click", () => {
-    document.querySelectorAll(".tab").forEach((b) => b.classList.remove("active"));
-    document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
+    document.querySelectorAll(".rail-item").forEach((b) => b.classList.remove("active"));
+    document.querySelectorAll(".panel").forEach((p) => p.classList.remove("active"));
     btn.classList.add("active");
     document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
   });
 });
 document.getElementById("logout").addEventListener("click", async () => {
-  await fetch("/api/logout", { method: "POST" });
-  window.location.href = "/login";
+  await fetch("/api/logout", { method: "POST" }); window.location.href = "/login";
 });
 
-// --- fixtures --------------------------------------------------------------
-function renderFixtures(list) {
-  const wrap = document.getElementById("fixtures");
-  wrap.innerHTML = "";
-  list.forEach((fx) => {
-    const p = fx.prediction;
-    const finished = fx.status === "finished";
-    const card = document.createElement("div");
-    card.className = "card" + (finished ? " finished" : "");
-    const header = finished
-      ? `${fx.round || ""} <span class="date">· Full time</span>`
-      : `${fx.round || ""} <span class="date">· ${fmtDate(fx.utc_date)}</span>`;
-    const teams = finished
-      ? `${fx.home} <span class="ft">${fx.score}</span> ${fx.away}`
-      : `${fx.home} <span style="color:var(--muted)">v</span> ${fx.away}`;
-    const body = finished
-      ? `<div class="bar pre">
-           <div class="seg home" style="width:${p.home_win}%">${p.home_win}%</div>
-           <div class="seg draw" style="width:${p.draw}%">${p.draw}%</div>
-           <div class="seg away" style="width:${p.away_win}%">${p.away_win}%</div>
-         </div>
-         <div class="meta"><span>Pre-match model prediction</span></div>`
-      : `<div class="bar">
-           <div class="seg home" style="width:${p.home_win}%">${p.home_win}%</div>
-           <div class="seg draw" style="width:${p.draw}%">${p.draw}%</div>
-           <div class="seg away" style="width:${p.away_win}%">${p.away_win}%</div>
-         </div>
-         <div class="meta">
-           <span>Score <b>${p.most_likely_score}</b></span>
-           <span>Goals <b>${p.total_goals}</b></span>
-           <span>O2.5 <b>${p.over25}%</b></span>
-           <span>BTTS <b>${p.btts}%</b></span>
-         </div>`;
-    card.innerHTML = `<div class="round">${header}</div>
-      <div class="teams">${teams}</div>${body}`;
-    card.addEventListener("click", () => showDetail(fx.home, fx.away, true));
-    wrap.appendChild(card);
+// --- match list ------------------------------------------------------------
+function rowMarkup(fx) {
+  const p = fx.prediction, fin = fx.status === "finished";
+  const mid = fin
+    ? `<span class="score">${fx.score}</span><span class="ftlabel">FT</span>`
+    : `${fmtTime(fx.utc_date)}`;
+  return `
+    <div class="mrow" data-id="${fx.id}">
+      <span class="home"><span class="nm">${fx.home}</span><span class="flag">${flag(fx.home)}</span></span>
+      <span class="mid">${mid}</span>
+      <span class="away"><span class="flag">${flag(fx.away)}</span><span class="nm">${fx.away}</span></span>
+      <span class="winbar">
+        <i class="s-h" style="width:${p.home_win}%"></i>
+        <i class="s-d" style="width:${p.draw}%"></i>
+        <i class="s-a" style="width:${p.away_win}%"></i>
+      </span>
+    </div>`;
+}
+function renderMatchList(list) {
+  const wrap = document.getElementById("matchlist");
+  const groups = {};
+  list.forEach((fx) => { (groups[fx.round] = groups[fx.round] || []).push(fx); });
+  wrap.innerHTML = Object.keys(groups).sort().map((g) =>
+    `<div class="group-head">${g}</div><div class="grp">${groups[g].map(rowMarkup).join("")}</div>`
+  ).join("");
+  wrap.querySelectorAll(".mrow").forEach((row) => {
+    row.addEventListener("click", () => {
+      const fx = ALL_FIXTURES.find((f) => f.id === row.dataset.id);
+      wrap.querySelectorAll(".mrow").forEach((r) => r.classList.remove("sel"));
+      row.classList.add("sel");
+      selectMatch(fx);
+    });
   });
 }
 async function loadFixtures() {
@@ -90,90 +97,133 @@ async function loadFixtures() {
   const badge = document.getElementById("source-badge");
   if (data.live) { badge.textContent = "live · " + data.source; badge.classList.add("live"); }
   else badge.textContent = data.source || "schedule";
-
   ALL_FIXTURES = data.fixtures;
-  const rounds = [...new Set(data.fixtures.map((f) => f.round).filter(Boolean))];
   const sel = document.getElementById("round-filter");
-  rounds.forEach((r) => sel.add(new Option(r, r)));
-  sel.onchange = () => renderFixtures(sel.value ? ALL_FIXTURES.filter((f) => f.round === sel.value) : ALL_FIXTURES);
-  renderFixtures(ALL_FIXTURES);
+  [...new Set(data.fixtures.map((f) => f.round))].forEach((r) => sel.add(new Option(r, r)));
+  sel.onchange = () => renderMatchList(sel.value ? ALL_FIXTURES.filter((f) => f.round === sel.value) : ALL_FIXTURES);
+  renderMatchList(ALL_FIXTURES);
+  // auto-select the first upcoming match
+  const first = ALL_FIXTURES.find((f) => f.status !== "finished") || ALL_FIXTURES[0];
+  if (first) {
+    selectMatch(first);
+    const row = document.querySelector(`.mrow[data-id="${first.id}"]`);
+    if (row) row.classList.add("sel");
+  }
 }
 
-// --- detailed prediction ---------------------------------------------------
-function heatmap(matrix, home, away) {
+// --- detail rendering (FotMob style) --------------------------------------
+function insightText(fx, d) {
+  const r = d.result;
+  if (fx.status === "finished") {
+    return `Full time: <b>${fx.home} ${fx.score} ${fx.away}</b>. Pre-match model: ${fx.home} ${r.home_win}% · draw ${r.draw}% · ${fx.away} ${r.away_win}%.`;
+  }
+  const arr = [["home", r.home_win, fx.home], ["away", r.away_win, fx.away], ["draw", r.draw, "draw"]];
+  arr.sort((a, b) => b[1] - a[1]);
+  const top = arr[0];
+  if (top[0] === "draw") return `Closely matched — the model slightly favours a <b>draw</b> (${r.draw}%).`;
+  const opp = top[0] === "home" ? fx.away : fx.home;
+  return `<b>${top[2]}</b> are ${top[1]}% likely to beat ${opp}.`;
+}
+function marketsMarkup(fx, d) {
+  const ou = d.goals.over_under, mk = d.markets;
+  const cs = d.correct_scores.map((c) => `<span class="chip">${c.score} <b>${c.prob}%</b></span>`).join("");
+  return `<div class="mk-grid">
+    <div class="block"><h3>Double chance &amp; qualify</h3>
+      <div class="row"><span>${fx.home} or draw (1X)</span><b>${d.result.double_chance["1X"]}%</b></div>
+      <div class="row"><span>${fx.away} or draw (X2)</span><b>${d.result.double_chance["X2"]}%</b></div>
+      <div class="row"><span>To qualify (ET/pens)</span><span>${d.advance.home}% / ${d.advance.away}%</span></div>
+      <div class="row"><span>Expected points</span><span>${d.result.expected_points.home} / ${d.result.expected_points.away}</span></div>
+    </div>
+    <div class="block"><h3>Goals</h3>
+      <div class="row"><span>Over 1.5 / 2.5 / 3.5</span><b>${ou["1.5"].over}% / ${ou["2.5"].over}% / ${ou["3.5"].over}%</b></div>
+      <div class="row"><span>Both teams to score</span><b>${d.goals.btts.yes}%</b></div>
+      <div class="row"><span>Clean sheet ${fx.home} / ${fx.away}</span><span>${mk.clean_sheet.home}% / ${mk.clean_sheet.away}%</span></div>
+      <div class="row"><span>Win to nil ${fx.home} / ${fx.away}</span><span>${mk.win_to_nil.home}% / ${mk.win_to_nil.away}%</span></div>
+    </div>
+    <div class="block"><h3>Handicap (goal line)</h3>
+      <div class="row"><span>${fx.home} -1.5</span><b>${mk.handicap["home_-1.5"]}%</b></div>
+      <div class="row"><span>${fx.home} +1.5</span><b>${mk.handicap["home_+1.5"]}%</b></div>
+      <div class="row"><span>${fx.away} -1.5</span><b>${mk.handicap["away_-1.5"]}%</b></div>
+      <div class="row"><span>${fx.away} +1.5</span><b>${mk.handicap["away_+1.5"]}%</b></div>
+    </div>
+    <div class="block"><h3>Most likely scores</h3><div class="scores">${cs}</div></div>
+  </div>`;
+}
+function heatmapMarkup(d) {
   let cells = `<div class="lbl"></div>`;
   for (let j = 0; j < 6; j++) cells += `<div class="lbl">${j}</div>`;
   for (let i = 0; i < 6; i++) {
     cells += `<div class="lbl">${i}</div>`;
     for (let j = 0; j < 6; j++) {
-      const v = matrix[i][j];
+      const v = d.matrix[i][j];
       cells += `<div class="cell" style="background:${heatColor(v)}" title="${i}-${j}: ${v}%">${v >= 3 ? v : ""}</div>`;
     }
   }
-  return `<div class="heat">${cells}</div>
-    <div class="heat-cap">Rows = ${home} goals, columns = ${away} goals (% likelihood)</div>`;
+  return `<div class="heat">${cells}</div><div class="heat-cap">Rows = ${d.home} goals, columns = ${d.away} goals (% likelihood)</div>`;
 }
-function predictionMarkup(d) {
-  const ou = d.goals.over_under, mk = d.markets;
-  const cs = d.correct_scores.map((c) => `<span class="chip">${c.score} <b>${c.prob}%</b></span>`).join("");
-  const hf = d.form && d.form.home ? `Form ${formLine(d.form.home.string)}` : "";
-  const af = d.form && d.form.away ? `Form ${formLine(d.form.away.string)}` : "";
+function detailMarkup(fx, d) {
+  const fin = fx.status === "finished";
+  const hf = d.form && d.form.home ? formLine(d.form.home.string) : "";
+  const af = d.form && d.form.away ? formLine(d.form.away.string) : "";
+  const center = fin
+    ? `<div class="dt-score">${fx.score}</div><div class="dt-ft">FULL TIME</div><div class="dt-status">${fx.round}</div>`
+    : `<div class="dt-time">${fmtTime(fx.utc_date)}</div><div class="dt-status">${fmtDay(fx.utc_date)} · ${fx.round}</div>`;
+  const fo = d.result.fair_odds;
   return `
-    <div class="detail">
-      <h2>${d.home} vs ${d.away}</h2>
-      <p class="sub">Elo ${d.home_elo} ${hf} &nbsp;·&nbsp; ${d.away_elo} ${af}<br/>
-        Expected goals ${d.expected.goals_home} – ${d.expected.goals_away} ·
-        most likely ${d.expected.most_likely_score}</p>
-      <div class="grid2">
-        <div class="block">
-          <h3>Match result (1X2)</h3>
-          <div class="row"><span>${d.home} win</span><b>${d.result.home_win}%</b></div>
-          <div class="row"><span>Draw</span><b>${d.result.draw}%</b></div>
-          <div class="row"><span>${d.away} win</span><b>${d.result.away_win}%</b></div>
-          <div class="row"><span>Fair odds</span><span>${d.result.fair_odds.home} / ${d.result.fair_odds.draw} / ${d.result.fair_odds.away}</span></div>
-          <div class="row"><span>Expected points</span><span>${d.result.expected_points.home} / ${d.result.expected_points.away}</span></div>
-        </div>
-        <div class="block">
-          <h3>Double chance &amp; qualify</h3>
-          <div class="row"><span>${d.home} or draw (1X)</span><b>${d.result.double_chance["1X"]}%</b></div>
-          <div class="row"><span>${d.away} or draw (X2)</span><b>${d.result.double_chance["X2"]}%</b></div>
-          <div class="row"><span>Either team (12)</span><b>${d.result.double_chance["12"]}%</b></div>
-          <div class="row"><span>To qualify (ET/pens)</span><span>${d.advance.home}% / ${d.advance.away}%</span></div>
-        </div>
-        <div class="block">
-          <h3>Goals</h3>
-          <div class="row"><span>Over 1.5 / 2.5 / 3.5</span><b>${ou["1.5"].over}% / ${ou["2.5"].over}% / ${ou["3.5"].over}%</b></div>
-          <div class="row"><span>Both teams to score</span><b>${d.goals.btts.yes}%</b></div>
-          <div class="row"><span>Clean sheet ${d.home} / ${d.away}</span><span>${mk.clean_sheet.home}% / ${mk.clean_sheet.away}%</span></div>
-          <div class="row"><span>Win to nil ${d.home} / ${d.away}</span><span>${mk.win_to_nil.home}% / ${mk.win_to_nil.away}%</span></div>
-        </div>
-        <div class="block">
-          <h3>Handicap (goal line)</h3>
-          <div class="row"><span>${d.home} -1.5</span><b>${mk.handicap["home_-1.5"]}%</b></div>
-          <div class="row"><span>${d.home} +1.5</span><b>${mk.handicap["home_+1.5"]}%</b></div>
-          <div class="row"><span>${d.away} -1.5</span><b>${mk.handicap["away_-1.5"]}%</b></div>
-          <div class="row"><span>${d.away} +1.5</span><b>${mk.handicap["away_+1.5"]}%</b></div>
-        </div>
-        <div class="block">
-          <h3>Most likely scores</h3>
-          <div class="scores">${cs}</div>
-        </div>
-        <div class="block">
-          <h3>Scoreline heatmap</h3>
-          ${heatmap(d.matrix, d.home, d.away)}
-        </div>
+    <div class="dt-head">
+      <div class="dt-team"><div class="dt-flag">${flag(fx.home)}</div><div class="dt-name">${fx.home}</div>
+        <div class="dt-sub">Elo ${d.home_elo} ${hf}</div></div>
+      <div class="dt-center">${center}</div>
+      <div class="dt-team"><div class="dt-flag">${flag(fx.away)}</div><div class="dt-name">${fx.away}</div>
+        <div class="dt-sub">Elo ${d.away_elo} ${af}</div></div>
+    </div>
+    <div class="dt-tabs">
+      <button class="dt-tab active" data-sub="pred">Prediction</button>
+      <button class="dt-tab" data-sub="mkts">Markets</button>
+      <button class="dt-tab" data-sub="heat">Heatmap</button>
+    </div>
+    <div class="dt-sub-panel active" data-sub="pred">
+      <div class="insight">💡 ${insightText(fx, d)}</div>
+      <div class="odds-row">
+        <div class="odds"><span>1 · ${fx.home}</span><b>${fo.home ?? "—"}</b></div>
+        <div class="odds"><span>X · Draw</span><b>${fo.draw ?? "—"}</b></div>
+        <div class="odds"><span>2 · ${fx.away}</span><b>${fo.away ?? "—"}</b></div>
       </div>
-    </div>`;
+      <div class="poll">
+        <div class="poll-title">Who will win?</div>
+        <div class="poll-row"><span>${fx.home}</span><div class="poll-track"><i class="home" style="width:${d.result.home_win}%"></i></div><b>${d.result.home_win}%</b></div>
+        <div class="poll-row"><span>Draw</span><div class="poll-track"><i class="draw" style="width:${d.result.draw}%"></i></div><b>${d.result.draw}%</b></div>
+        <div class="poll-row"><span>${fx.away}</span><div class="poll-track"><i class="away" style="width:${d.result.away_win}%"></i></div><b>${d.result.away_win}%</b></div>
+      </div>
+      <div class="block"><h3>Model expectation</h3>
+        <div class="row"><span>Expected goals</span><b>${d.expected.goals_home} – ${d.expected.goals_away}</b></div>
+        <div class="row"><span>Most likely score</span><b>${d.expected.most_likely_score}</b></div>
+        <div class="row"><span>Total goals · BTTS</span><span>${d.expected.total} · ${d.goals.btts.yes}%</span></div>
+      </div>
+    </div>
+    <div class="dt-sub-panel" data-sub="mkts">${marketsMarkup(fx, d)}</div>
+    <div class="dt-sub-panel" data-sub="heat">${heatmapMarkup(d)}</div>`;
+}
+function wireSubTabs(container) {
+  container.querySelectorAll(".dt-tab").forEach((t) => {
+    t.addEventListener("click", () => {
+      container.querySelectorAll(".dt-tab").forEach((x) => x.classList.remove("active"));
+      container.querySelectorAll(".dt-sub-panel").forEach((x) => x.classList.remove("active"));
+      t.classList.add("active");
+      container.querySelector(`.dt-sub-panel[data-sub="${t.dataset.sub}"]`).classList.add("active");
+    });
+  });
+}
+async function selectMatch(fx) {
+  SELECTED = fx;
+  const pane = document.getElementById("detail-pane");
+  pane.innerHTML = `<div class="detail-empty"><p>Loading…</p></div>`;
+  const d = await getPrediction(fx.home, fx.away, true, true);
+  pane.innerHTML = detailMarkup(fx, d);
+  wireSubTabs(pane);
 }
 const getPrediction = (home, away, neutral, useForm) =>
   jpost("/api/predict", { home, away, neutral, use_form: useForm });
-async function showDetail(home, away, neutral) {
-  const d = await getPrediction(home, away, neutral, true);
-  document.getElementById("modal-body").innerHTML = predictionMarkup(d);
-  document.getElementById("modal").hidden = false;
-}
-document.getElementById("modal-close").addEventListener("click", () => { document.getElementById("modal").hidden = true; });
-document.getElementById("modal").addEventListener("click", (e) => { if (e.target.id === "modal") document.getElementById("modal").hidden = true; });
 
 // --- rankings --------------------------------------------------------------
 async function loadRankings() {
@@ -181,18 +231,16 @@ async function loadRankings() {
   const max = teams[0].elo, min = teams[teams.length - 1].elo;
   document.getElementById("rankings").innerHTML = teams.map((t) => {
     const pct = Math.round(8 + 92 * (t.elo - min) / Math.max(1, max - min));
-    return `<div class="rank-row">
-      <div class="num">${t.rank}</div>
+    return `<div class="rank-row"><div class="num">${t.rank}</div><div class="rflag">${flag(t.name)}</div>
       <div><div class="name">${t.name}</div><div class="tier">${t.tier}</div></div>
-      <div class="rank-bar"><i style="width:${pct}%"></i></div>
-      <div class="elo">${t.elo}</div></div>`;
+      <div class="rank-bar"><i style="width:${pct}%"></i></div><div class="elo">${t.elo}</div></div>`;
   }).join("");
 }
 
 // --- team selects ----------------------------------------------------------
-function fillTeamSelect(sel, selectedIndex = 0) {
-  TEAMS.forEach((t) => sel.add(new Option(`${t.name} (${t.elo})`, t.name)));
-  sel.selectedIndex = Math.min(selectedIndex, TEAMS.length - 1);
+function fillTeamSelect(sel, idx = 0) {
+  TEAMS.forEach((t) => sel.add(new Option(`${flag(t.name)} ${t.name} (${t.elo})`, t.name)));
+  sel.selectedIndex = Math.min(idx, TEAMS.length - 1);
 }
 async function loadTeams() {
   const { teams } = await api("/api/teams");
@@ -208,47 +256,45 @@ document.getElementById("run-matchup").addEventListener("click", async () => {
   const neutral = !document.getElementById("home-adv").checked;
   const useForm = document.getElementById("use-form").checked;
   const d = await getPrediction(home, away, neutral, useForm);
-  document.getElementById("matchup-result").innerHTML = predictionMarkup(d);
+  const fx = { home, away, round: "Custom matchup", status: "upcoming", utc_date: null };
+  const el = document.getElementById("matchup-result");
+  el.innerHTML = detailMarkup(fx, d);
+  wireSubTabs(el);
 });
 
-// --- knockout simulator ----------------------------------------------------
-function renderBracketPicks(size, seedTop) {
+// --- knockout --------------------------------------------------------------
+function renderBracketPicks(size) {
   const wrap = document.getElementById("bracket-picks");
   wrap.innerHTML = "";
   for (let i = 0; i < size; i++) {
     const sel = document.createElement("select");
-    TEAMS.forEach((t) => sel.add(new Option(t.name, t.name)));
-    sel.selectedIndex = seedTop ? Math.min(i, TEAMS.length - 1) : i % TEAMS.length;
-    sel.className = "bracket-pick";
+    sel.className = "bracket-pick pill-select";
+    TEAMS.forEach((t) => sel.add(new Option(`${flag(t.name)} ${t.name}`, t.name)));
+    sel.selectedIndex = Math.min(i, TEAMS.length - 1);
     wrap.appendChild(sel);
   }
 }
-document.getElementById("bracket-size").addEventListener("change", (e) => renderBracketPicks(+e.target.value, true));
-document.getElementById("seed-top").addEventListener("click", () => renderBracketPicks(+document.getElementById("bracket-size").value, true));
+document.getElementById("bracket-size").addEventListener("change", (e) => renderBracketPicks(+e.target.value));
+document.getElementById("seed-top").addEventListener("click", () => renderBracketPicks(+document.getElementById("bracket-size").value));
 document.getElementById("run-bracket").addEventListener("click", async () => {
   const teams = [...document.querySelectorAll(".bracket-pick")].map((s) => s.value);
   const res = document.getElementById("bracket-result");
   res.innerHTML = "<p class='hint'>Simulating…</p>";
   const data = await jpost("/api/bracket", { teams, sims: 20000 });
   const cols = data.rounds.map((r) => `<th>${r}</th>`).join("");
-  const rows = data.teams.map((t) => `
-    <tr><td>${t.team}</td>
-    ${data.rounds.map((r) => `<td>${t[r]}%</td>`).join("")}
-    <td class="champ">${t.champion}%</td></tr>`).join("");
+  const rows = data.teams.map((t) => `<tr><td>${flag(t.team)} ${t.team}</td>${data.rounds.map((r) => `<td>${t[r]}%</td>`).join("")}<td class="champ">${t.champion}%</td></tr>`).join("");
   res.innerHTML = `<p class="hint">${data.sims.toLocaleString()} simulations</p>
-    <table class="bracket-table"><thead><tr><th>Team</th>${cols}<th>Champion</th></tr></thead>
-    <tbody>${rows}</tbody></table>`;
+    <table class="bracket-table"><thead><tr><th>Team</th>${cols}<th>Champion</th></tr></thead><tbody>${rows}</tbody></table>`;
 });
 
-// --- value calculator ------------------------------------------------------
+// --- value -----------------------------------------------------------------
 document.getElementById("run-value").addEventListener("click", async () => {
   const probability = parseFloat(document.getElementById("v-prob").value);
   const odds = parseFloat(document.getElementById("v-odds").value);
   if (isNaN(probability) || isNaN(odds)) return;
   const v = await jpost("/api/value", { probability, odds });
-  const cls = v.value ? "good" : "bad";
   document.getElementById("value-result").innerHTML = `
-    <div class="verdict ${cls}">
+    <div class="verdict ${v.value ? "good" : "bad"}">
       <div class="big">${v.value ? "✅ Value bet" : "❌ No value"}</div>
       <div class="row"><span>Your model probability</span><b>${probability}%</b></div>
       <div class="row"><span>Bookmaker implied probability</span><b>${v.implied_pct}%</b></div>
@@ -262,38 +308,31 @@ document.getElementById("run-value").addEventListener("click", async () => {
 async function loadResultsLog() {
   const { results } = await api("/api/results");
   const wrap = document.getElementById("results-log");
-  if (!results.length) { wrap.innerHTML = "<p class='hint'>No results recorded yet.</p>"; return; }
-  wrap.innerHTML = results.map((r) => `
-    <div class="log-row">
-      <span>${r.home} <b>${r.goals_home}–${r.goals_away}</b> ${r.away}</span>
+  if (!results.length) { wrap.innerHTML = "<p class='hint'>No manually recorded results yet.</p>"; return; }
+  wrap.innerHTML = results.map((r) => `<div class="log-row">
+      <span>${flag(r.home)} ${r.home} <b>${r.goals_home}–${r.goals_away}</b> ${r.away} ${flag(r.away)}</span>
       <span class="delta">${r.home} ${r.home_delta >= 0 ? "+" : ""}${r.home_delta} · ${r.away} ${r.away_delta >= 0 ? "+" : ""}${r.away_delta}</span>
     </div>`).join("");
 }
 document.getElementById("run-result").addEventListener("click", async () => {
-  const home = document.getElementById("r-home").value;
-  const away = document.getElementById("r-away").value;
-  const gh = parseInt(document.getElementById("r-gh").value, 10);
-  const ga = parseInt(document.getElementById("r-ga").value, 10);
+  const home = document.getElementById("r-home").value, away = document.getElementById("r-away").value;
+  const gh = parseInt(document.getElementById("r-gh").value, 10), ga = parseInt(document.getElementById("r-ga").value, 10);
   if (isNaN(gh) || isNaN(ga)) return;
   const r = await jpost("/api/result", { home, away, goals_home: gh, goals_away: ga });
   document.getElementById("result-feedback").innerHTML =
-    `<div class="toast">Saved. ${r.home} ${r.home_before}→${r.home_after} (${r.home_delta >= 0 ? "+" : ""}${r.home_delta}),
-     ${r.away} ${r.away_before}→${r.away_after} (${r.away_delta >= 0 ? "+" : ""}${r.away_delta}).</div>`;
+    `<div class="toast">Saved. ${r.home} ${r.home_before}→${r.home_after} (${r.home_delta >= 0 ? "+" : ""}${r.home_delta}), ${r.away} ${r.away_before}→${r.away_after} (${r.away_delta >= 0 ? "+" : ""}${r.away_delta}).</div>`;
   await Promise.all([loadResultsLog(), loadRankings(), refreshTeams()]);
 });
 document.getElementById("reset-ratings").addEventListener("click", async () => {
-  if (!confirm("Reset all ratings to their seed values and clear the result log?")) return;
+  if (!confirm("Reset all ratings to their seed + played-results baseline?")) return;
   await api("/api/ratings/reset", { method: "POST" });
-  document.getElementById("result-feedback").innerHTML = "<div class='toast'>Ratings reset to seed values.</div>";
+  document.getElementById("result-feedback").innerHTML = "<div class='toast'>Ratings reset.</div>";
   await Promise.all([loadResultsLog(), loadRankings(), refreshTeams()]);
 });
-
 async function refreshTeams() {
-  const { teams } = await api("/api/teams");
-  TEAMS = teams;
+  const { teams } = await api("/api/teams"); TEAMS = teams;
   ["home-team", "away-team", "r-home", "r-away"].forEach((id) => {
-    const el = document.getElementById(id), keep = el.selectedIndex;
-    el.innerHTML = "";
+    const el = document.getElementById(id), keep = el.selectedIndex; el.innerHTML = "";
     fillTeamSelect(el, keep < 0 ? 0 : keep);
   });
 }
@@ -301,19 +340,16 @@ async function refreshTeams() {
 // --- boot ------------------------------------------------------------------
 async function loadMeta() {
   try {
-    const meta = await api("/api/meta");
-    if (!meta.auth_required) {
-      const lo = document.getElementById("logout");
-      if (lo) lo.style.display = "none";
-    }
-  } catch (e) { /* ignore */ }
+    const m = await api("/api/meta");
+    if (!m.auth_required) { const lo = document.getElementById("logout"); if (lo) lo.hidden = true; }
+    else { const lo = document.getElementById("logout"); if (lo) lo.hidden = false; }
+  } catch (e) {}
 }
-
 (async function init() {
   try {
     await loadMeta();
     await loadTeams();
     await Promise.all([loadFixtures(), loadRankings(), loadResultsLog()]);
-    renderBracketPicks(8, true);
-  } catch (e) { /* 401 already redirected */ }
+    renderBracketPicks(8);
+  } catch (e) { /* 401 redirected */ }
 })();

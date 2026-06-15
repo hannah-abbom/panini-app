@@ -7,104 +7,121 @@
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">⚽ <span>Panini</span></div>
-    <div class="spacer"></div>
-    <span id="source-badge" class="badge"></span>
-    <button id="logout" class="ghost">Log out</button>
-  </header>
+  <div class="layout">
+    <!-- Left icon rail (FotMob-style) -->
+    <nav class="rail">
+      <div class="rail-logo">⚽</div>
+      <button class="rail-item active" data-tab="matches"><span class="ico">🗓️</span><span>Matches</span></button>
+      <button class="rail-item" data-tab="rankings"><span class="ico">📊</span><span>Ranking</span></button>
+      <button class="rail-item" data-tab="matchup"><span class="ico">⚔️</span><span>Matchup</span></button>
+      <button class="rail-item" data-tab="knockout"><span class="ico">🏆</span><span>Knockout</span></button>
+      <button class="rail-item" data-tab="value"><span class="ico">💰</span><span>Value</span></button>
+      <button class="rail-item" data-tab="results"><span class="ico">📝</span><span>Results</span></button>
+      <div class="rail-spacer"></div>
+      <button id="logout" class="rail-item" hidden><span class="ico">↩︎</span><span>Log out</span></button>
+    </nav>
 
-  <nav class="tabs">
-    <button class="tab active" data-tab="fixtures">Fixtures</button>
-    <button class="tab" data-tab="rankings">Power rankings</button>
-    <button class="tab" data-tab="matchup">Matchup</button>
-    <button class="tab" data-tab="knockout">Knockout sim</button>
-    <button class="tab" data-tab="value">Value</button>
-    <button class="tab" data-tab="results">Results</button>
-  </nav>
+    <main class="content">
+      <!-- MATCHES: list + detail -->
+      <section id="tab-matches" class="panel active">
+        <div class="col-list">
+          <div class="list-head">
+            <div class="title">FIFA World Cup 2026</div>
+            <span id="source-badge" class="badge"></span>
+          </div>
+          <div class="filterbar">
+            <select id="round-filter" class="pill-select"><option value="">All groups</option></select>
+          </div>
+          <div id="matchlist" class="matchlist"></div>
+        </div>
+        <aside class="col-detail">
+          <div id="detail-pane" class="detail-pane">
+            <div class="detail-empty">
+              <div class="big-ball">⚽</div>
+              <p>Select a match to see the full prediction.</p>
+            </div>
+          </div>
+        </aside>
+      </section>
 
-  <main>
-    <!-- Fixtures ------------------------------------------------------->
-    <section id="tab-fixtures" class="tab-panel active">
-      <div class="toolbar">
-        <p class="hint">Elo + Dixon-Coles/Poisson model. Tap a match for every market.</p>
-        <select id="round-filter" class="mini"><option value="">All rounds</option></select>
-      </div>
-      <div id="fixtures" class="cards"></div>
-    </section>
+      <!-- RANKINGS -->
+      <section id="tab-rankings" class="panel">
+        <div class="pad">
+          <h2 class="ph">Power rankings</h2>
+          <p class="hint">Live World-Football-Elo strength ratings — updated as results come in.</p>
+          <div id="rankings" class="rankings"></div>
+        </div>
+      </section>
 
-    <!-- Power rankings ------------------------------------------------->
-    <section id="tab-rankings" class="tab-panel">
-      <p class="hint">Live World-Football-Elo strength ratings (updated as you record results).</p>
-      <div id="rankings" class="rankings"></div>
-    </section>
+      <!-- MATCHUP -->
+      <section id="tab-matchup" class="panel">
+        <div class="pad">
+          <h2 class="ph">Custom matchup</h2>
+          <div class="picker">
+            <select id="home-team" class="pill-select"></select>
+            <span class="vs">vs</span>
+            <select id="away-team" class="pill-select"></select>
+            <label class="check"><input type="checkbox" id="home-adv" /> home advantage (1st team)</label>
+            <label class="check"><input type="checkbox" id="use-form" checked /> use recent form</label>
+            <button id="run-matchup">Predict</button>
+          </div>
+          <div id="matchup-result" class="inline-detail"></div>
+        </div>
+      </section>
 
-    <!-- Matchup -------------------------------------------------------->
-    <section id="tab-matchup" class="tab-panel">
-      <div class="picker">
-        <select id="home-team"></select>
-        <span class="vs">vs</span>
-        <select id="away-team"></select>
-        <label class="check"><input type="checkbox" id="home-adv" /> home advantage (1st team)</label>
-        <label class="check"><input type="checkbox" id="use-form" checked /> use recent form</label>
-        <button id="run-matchup">Predict</button>
-      </div>
-      <div id="matchup-result"></div>
-    </section>
+      <!-- KNOCKOUT -->
+      <section id="tab-knockout" class="panel">
+        <div class="pad">
+          <h2 class="ph">Knockout simulator</h2>
+          <p class="hint">Build a bracket and Monte-Carlo simulate it (extra time + penalties resolve draws).</p>
+          <div class="knockout-controls">
+            <select id="bracket-size" class="pill-select">
+              <option value="4">4 teams</option>
+              <option value="8" selected>8 teams</option>
+              <option value="16">16 teams</option>
+            </select>
+            <button id="seed-top" class="ghost">Seed with top teams</button>
+            <button id="run-bracket">Simulate</button>
+          </div>
+          <div id="bracket-picks" class="bracket-picks"></div>
+          <div id="bracket-result"></div>
+        </div>
+      </section>
 
-    <!-- Knockout simulator --------------------------------------------->
-    <section id="tab-knockout" class="tab-panel">
-      <p class="hint">Build a single-elimination bracket and Monte-Carlo simulate it
-        (extra time + penalties resolve draws). Pick a power-of-two number of teams.</p>
-      <div class="knockout-controls">
-        <select id="bracket-size" class="mini">
-          <option value="4">4 teams</option>
-          <option value="8" selected>8 teams</option>
-          <option value="16">16 teams</option>
-        </select>
-        <button id="seed-top" class="ghost">Seed with top teams</button>
-        <button id="run-bracket">Simulate</button>
-      </div>
-      <div id="bracket-picks" class="bracket-picks"></div>
-      <div id="bracket-result"></div>
-    </section>
+      <!-- VALUE -->
+      <section id="tab-value" class="panel">
+        <div class="pad">
+          <h2 class="ph">Value calculator</h2>
+          <p class="hint">Enter the model's probability and the bookmaker's decimal odds for your edge and Kelly stake.</p>
+          <div class="value-form">
+            <label>Model probability (%)<input type="number" id="v-prob" step="0.1" placeholder="42.5" /></label>
+            <label>Bookmaker odds (decimal)<input type="number" id="v-odds" step="0.01" placeholder="2.40" /></label>
+            <button id="run-value">Calculate</button>
+          </div>
+          <div id="value-result"></div>
+        </div>
+      </section>
 
-    <!-- Value calculator ----------------------------------------------->
-    <section id="tab-value" class="tab-panel">
-      <p class="hint">Enter the model's probability and the bookmaker's decimal odds
-        to see your edge and a Kelly-criterion stake.</p>
-      <div class="value-form">
-        <label>Model probability (%)<input type="number" id="v-prob" step="0.1" placeholder="42.5" /></label>
-        <label>Bookmaker odds (decimal)<input type="number" id="v-odds" step="0.01" placeholder="2.40" /></label>
-        <button id="run-value">Calculate</button>
-      </div>
-      <div id="value-result"></div>
-    </section>
-
-    <!-- Results -------------------------------------------------------->
-    <section id="tab-results" class="tab-panel">
-      <p class="hint">Record a finished match to update the model's Elo ratings.
-        These persist between sessions.</p>
-      <div class="result-form">
-        <select id="r-home"></select>
-        <input type="number" id="r-gh" min="0" class="goals" placeholder="0" />
-        <span class="vs">–</span>
-        <input type="number" id="r-ga" min="0" class="goals" placeholder="0" />
-        <select id="r-away"></select>
-        <button id="run-result">Save result</button>
-        <button id="reset-ratings" class="ghost danger">Reset ratings</button>
-      </div>
-      <div id="result-feedback"></div>
-      <h3 class="section-title">Recent results</h3>
-      <div id="results-log" class="results-log"></div>
-    </section>
-  </main>
-
-  <div id="modal" class="modal" hidden>
-    <div class="modal-card">
-      <button id="modal-close" class="modal-close">×</button>
-      <div id="modal-body"></div>
-    </div>
+      <!-- RESULTS -->
+      <section id="tab-results" class="panel">
+        <div class="pad">
+          <h2 class="ph">Record a result</h2>
+          <p class="hint">Add a finished match to update the model's Elo ratings.</p>
+          <div class="result-form">
+            <select id="r-home" class="pill-select"></select>
+            <input type="number" id="r-gh" min="0" class="goals" placeholder="0" />
+            <span class="vs">–</span>
+            <input type="number" id="r-ga" min="0" class="goals" placeholder="0" />
+            <select id="r-away" class="pill-select"></select>
+            <button id="run-result">Save</button>
+            <button id="reset-ratings" class="ghost danger">Reset ratings</button>
+          </div>
+          <div id="result-feedback"></div>
+          <h3 class="section-title">Recent results</h3>
+          <div id="results-log" class="results-log"></div>
+        </div>
+      </section>
+    </main>
   </div>
 
   <script src="/static/app.js"></script>
