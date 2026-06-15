@@ -22,12 +22,17 @@ STORE_PATH = DATA_DIR / "store.json"
 _lock = threading.Lock()
 
 
-def _base_ratings() -> dict[str, float]:
-    """Seed ratings with the already-played World Cup results folded in.
+_base_memo: dict = {"ts": 0.0, "data": None}
 
-    Deterministic and independent of the mutable store, so a fresh deploy
-    always reflects what has actually happened so far.
+
+def _base_ratings() -> dict[str, float]:
+    """Seed ratings with the StatsBomb prior and played results folded in.
+
+    Deterministic within a run, so we memoize it (10 min) — this is called on
+    every prediction and was previously rebuilt each time.
     """
+    if _base_memo["data"] is not None and time.time() - _base_memo["ts"] < 600:
+        return dict(_base_memo["data"])
     r = dict(ratings.SEED_RATINGS)
     # Real-results prior from StatsBomb open data (bounded, defensive).
     for team, delta in statsbomb.team_deltas().items():
@@ -39,6 +44,7 @@ def _base_ratings() -> dict[str, float]:
         ra = r.get(a, ratings.DEFAULT_RATING)
         nh, na = elo.update(rh, ra, gh, ga, neutral=True)
         r[h], r[a] = round(nh, 1), round(na, 1)
+    _base_memo.update(ts=time.time(), data=dict(r))
     return r
 
 

@@ -87,6 +87,25 @@ def world_cup_results(date_iso: str) -> dict | None:
     return out or None
 
 
+def world_cup_live(date_iso: str) -> dict | None:
+    """In-progress World Cup matches: (home, away) -> (gh, ga)."""
+    data = _get(f"/sport/football/scheduled-events/{date_iso}")
+    if not data:
+        return None
+    out: dict = {}
+    for ev in data.get("events", []):
+        if "World Cup" not in (ev.get("tournament") or {}).get("name", ""):
+            continue
+        if ev.get("status", {}).get("type") != "inprogress":
+            continue
+        try:
+            out[(ev["homeTeam"]["name"], ev["awayTeam"]["name"])] = (
+                ev["homeScore"].get("current", 0), ev["awayScore"].get("current", 0))
+        except (KeyError, TypeError):
+            continue
+    return out or None
+
+
 def scheduled_football(date_iso: str) -> list[dict] | None:
     """All scheduled football events for a date (YYYY-MM-DD), World Cup only."""
     data = _get(f"/sport/football/scheduled-events/{date_iso}")

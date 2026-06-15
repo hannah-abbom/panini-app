@@ -42,6 +42,36 @@ const FLAGS = {
 };
 const flag = (n) => FLAGS[n] || "🏳️";
 
+const TEAM_COLORS = {
+  "Argentina":"#6ca6e0","Spain":"#e63946","France":"#3b5fb0","Brazil":"#f7d000","England":"#e8e8e8",
+  "Portugal":"#c8102e","Netherlands":"#f36c21","Belgium":"#e8b923","Germany":"#dadada","Croatia":"#e63946",
+  "Uruguay":"#5fa8d3","Colombia":"#f7d000","Morocco":"#c1272d","Switzerland":"#d52b1e","United States":"#3c3b6e",
+  "USA":"#3c3b6e","Norway":"#ba0c2f","Japan":"#1b1f7a","Mexico":"#0a7d3e","Senegal":"#00853f","Ecuador":"#ffd100",
+  "Austria":"#ed2939","Korea Republic":"#c8102e","South Korea":"#c8102e","Sweden":"#ffcd00","Egypt":"#c8102e",
+  "Australia":"#0a7d3e","Turkey":"#e30a17","Turkiye":"#e30a17","Canada":"#d80621","Ivory Coast":"#f77f00",
+  "Ghana":"#ce1126","Iran":"#239f40","Czechia":"#11457e","Algeria":"#007a3d","Tunisia":"#e70013","Scotland":"#0065bf",
+  "Paraguay":"#d52b1e","DR Congo":"#3da5e0","Bosnia and Herzegovina":"#002395","South Africa":"#007a4d",
+  "Qatar":"#8a1538","Saudi Arabia":"#006c35","Panama":"#db0a16","Uzbekistan":"#1eb53a","Iraq":"#ce1126",
+  "Jordan":"#007a3d","Cape Verde":"#003893","New Zealand":"#000000","Curacao":"#002b7f","Haiti":"#00209f",
+};
+const teamColor = (n) => TEAM_COLORS[n] || "#5a6678";
+
+function countUp(el) {
+  const m = el.textContent.trim().match(/^([\d.]+)(.*)$/);
+  if (!m) return;
+  const target = parseFloat(m[1]), suffix = m[2], dec = (m[1].split(".")[1] || "").length;
+  const start = performance.now(), dur = 550;
+  (function step(t) {
+    const p = Math.min(1, (t - start) / dur);
+    const v = target * (0.5 - 0.5 * Math.cos(Math.PI * p));
+    el.textContent = v.toFixed(dec) + suffix;
+    if (p < 1) requestAnimationFrame(step); else el.textContent = m[1] + suffix;
+  })(start);
+}
+function animateDetail(container) {
+  container.querySelectorAll(".poll-row b, .odds b").forEach(countUp);
+}
+
 // --- state -----------------------------------------------------------------
 let TEAMS = [], ALL_FIXTURES = [], SELECTED = null;
 
@@ -60,8 +90,10 @@ document.getElementById("logout").addEventListener("click", async () => {
 
 // --- match list ------------------------------------------------------------
 function rowMarkup(fx) {
-  const p = fx.prediction, fin = fx.status === "finished";
-  const mid = fin
+  const p = fx.prediction, fin = fx.status === "finished", live = fx.status === "live";
+  const mid = live
+    ? `<span class="score livescore">${fx.score}</span><span class="livelbl">● LIVE</span>`
+    : fin
     ? `<span class="score">${fx.score}</span><span class="ftlabel">FT</span>`
     : `${fmtTime(fx.utc_date)}`;
   return `
@@ -74,7 +106,7 @@ function rowMarkup(fx) {
         <i class="s-d" style="width:${p.draw}%"></i>
         <i class="s-a" style="width:${p.away_win}%"></i>
       </span>
-      ${!fin && p.tip ? `<span class="rowtip">🎯 ${p.tip.selection} <b>@ ${p.tip.odds}</b> ${stars(p.tip.stars)}</span>` : ""}
+      ${!fin && !live && p.tip ? `<span class="rowtip">🎯 ${p.tip.selection} <b>@ ${p.tip.odds}</b> ${stars(p.tip.stars)}</span>` : ""}
     </div>`;
 }
 function renderMatchList(list) {
@@ -93,23 +125,52 @@ function renderMatchList(list) {
     });
   });
 }
+let FILTER_READY = false;
+function applyFilter() {
+  const sel = document.getElementById("round-filter");
+  renderMatchList(sel.value ? ALL_FIXTURES.filter((f) => f.round === sel.value) : ALL_FIXTURES);
+  if (SELECTED) {
+    const row = document.querySelector(`.mrow[data-id="${SELECTED.id}"]`);
+    if (row) row.classList.add("sel");
+  }
+}
 async function loadFixtures() {
   const data = await api("/api/fixtures");
   const badge = document.getElementById("source-badge");
-  if (data.live) { badge.textContent = "live · " + data.source; badge.classList.add("live"); }
-  else badge.textContent = data.source || "schedule";
+  const anyLive = data.fixtures.some((f) => f.status === "live");
+  if (anyLive) { badge.textContent = "● live games in play"; badge.classList.add("live"); }
+  else if (data.live) { badge.textContent = "live · " + data.source; badge.classList.add("live"); }
+  else { badge.textContent = data.source || "schedule"; badge.classList.remove("live"); }
   ALL_FIXTURES = data.fixtures;
-  const sel = document.getElementById("round-filter");
-  [...new Set(data.fixtures.map((f) => f.round))].forEach((r) => sel.add(new Option(r, r)));
-  sel.onchange = () => renderMatchList(sel.value ? ALL_FIXTURES.filter((f) => f.round === sel.value) : ALL_FIXTURES);
-  renderMatchList(ALL_FIXTURES);
-  // auto-select the first upcoming match
-  const first = ALL_FIXTURES.find((f) => f.status !== "finished") || ALL_FIXTURES[0];
-  if (first) {
-    selectMatch(first);
-    const row = document.querySelector(`.mrow[data-id="${first.id}"]`);
-    if (row) row.classList.add("sel");
+  if (!FILTER_READY) {
+    const sel = document.getElementById("round-filter");
+    [...new Set(data.fixtures.map((f) => f.round))].forEach((r) => sel.add(new Option(r, r)));
+    sel.onchange = applyFilter;
+    FILTER_READY = true;
   }
+  applyFilter();
+  if (!SELECTED) {
+    const first = ALL_FIXTURES.find((f) => f.status === "live")
+      || ALL_FIXTURES.find((f) => f.status !== "finished") || ALL_FIXTURES[0];
+    if (first) { selectMatch(first); const r = document.querySelector(`.mrow[data-id="${first.id}"]`); if (r) r.classList.add("sel"); }
+  }
+}
+function startLivePolling() {
+  setInterval(async () => {
+    try {
+      const data = await api("/api/fixtures");
+      ALL_FIXTURES = data.fixtures;
+      const badge = document.getElementById("source-badge");
+      const anyLive = data.fixtures.some((f) => f.status === "live");
+      badge.textContent = anyLive ? "● live games in play" : (data.live ? "live · " + data.source : data.source);
+      badge.classList.toggle("live", anyLive || data.live);
+      applyFilter();
+      if (SELECTED && SELECTED.status === "live") {
+        const fresh = ALL_FIXTURES.find((f) => f.id === SELECTED.id);
+        if (fresh) selectMatch(fresh);
+      }
+    } catch (e) { /* ignore transient */ }
+  }, 40000);
 }
 
 // --- detail rendering (FotMob style) --------------------------------------
@@ -207,15 +268,17 @@ function heatmapMarkup(d) {
   </div>`;
 }
 function detailMarkup(fx, d) {
-  const fin = fx.status === "finished";
+  const fin = fx.status === "finished", live = fx.status === "live";
   const hf = d.form && d.form.home ? formLine(d.form.home.string) : "";
   const af = d.form && d.form.away ? formLine(d.form.away.string) : "";
-  const center = fin
+  const center = live
+    ? `<div class="dt-score">${fx.score}</div><div class="dt-ft livenow">● LIVE</div><div class="dt-status">${fx.round}</div>`
+    : fin
     ? `<div class="dt-score">${fx.score}</div><div class="dt-ft">FULL TIME</div><div class="dt-status">${fx.round}</div>`
     : `<div class="dt-time">${fmtTime(fx.utc_date)}</div><div class="dt-status">${fmtDay(fx.utc_date)} · ${fx.round}</div>`;
   const fo = d.result.fair_odds;
   return `
-    <div class="dt-head">
+    <div class="dt-head" style="--ch:${teamColor(fx.home)};--ca:${teamColor(fx.away)}">
       <div class="dt-team"><div class="dt-flag">${flag(fx.home)}</div><div class="dt-name">${fx.home}</div>
         <div class="dt-sub">Elo ${d.home_elo} ${hf}</div></div>
       <div class="dt-center">${center}</div>
@@ -269,6 +332,7 @@ async function selectMatch(fx) {
   const d = await getPrediction(fx.home, fx.away, true, true);
   pane.innerHTML = detailMarkup(fx, d);
   wireSubTabs(pane);
+  animateDetail(pane);
 }
 const getPrediction = (home, away, neutral, useForm) =>
   jpost("/api/predict", { home, away, neutral, use_form: useForm });
@@ -377,6 +441,7 @@ document.getElementById("run-matchup").addEventListener("click", async () => {
   const el = document.getElementById("matchup-result");
   el.innerHTML = detailMarkup(fx, d);
   wireSubTabs(el);
+  animateDetail(el);
 });
 
 // --- knockout --------------------------------------------------------------
@@ -475,9 +540,8 @@ function initChat(aiEnabled) {
     if (open) {
       panel.removeAttribute("hidden");
       if (!CHAT.length) {
-        chatBubble("bot", aiEnabled
-          ? "Hi, I'm Predi AI ⚽ — your World Cup betting assistant. Ask me things like \"who should I back in Brazil vs Morocco?\" or \"best over/under tonight?\""
-          : "Hi, I'm Predi AI ⚽. I'm not switched on yet — add an ANTHROPIC_API_KEY in your hosting settings and I'll come to life to talk through the model's tips with you.");
+        chatBubble("bot", "Hi, I'm Predi AI ⚽ — your World Cup betting assistant. Ask me about any match (\"Brazil vs Morocco\"), the \"best bets\", corners, cards or goals."
+          + (aiEnabled ? "" : " (Running in quick mode — add an ANTHROPIC_API_KEY for smarter, conversational answers.)"));
       }
       input.focus();
     } else {
@@ -505,6 +569,21 @@ function initChat(aiEnabled) {
   });
 }
 
+// --- theme -----------------------------------------------------------------
+(function initTheme() {
+  const btn = document.getElementById("theme-toggle");
+  const apply = (t) => {
+    document.body.classList.toggle("light", t === "light");
+    btn.querySelector(".ico").textContent = t === "light" ? "☀️" : "🌙";
+  };
+  apply(localStorage.getItem("theme") || "dark");
+  btn.addEventListener("click", () => {
+    const t = document.body.classList.contains("light") ? "dark" : "light";
+    localStorage.setItem("theme", t);
+    apply(t);
+  });
+})();
+
 // --- boot ------------------------------------------------------------------
 async function loadMeta() {
   try {
@@ -520,5 +599,6 @@ async function loadMeta() {
     await loadTeams();
     await Promise.all([loadFixtures(), loadTips(), loadRankings(), loadResultsLog(), loadNews()]);
     renderBracketPicks(8);
+    startLivePolling();
   } catch (e) { /* 401 redirected */ }
 })();

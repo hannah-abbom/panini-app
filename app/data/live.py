@@ -1,10 +1,10 @@
-"""Live result overlay — auto-updates finished scores as games complete.
+"""Live result overlay — auto-updates finished and in-progress games.
 
-Polls SofaScore for World Cup results across a window of recent days and
-returns a map of finished scores keyed by canonical (home, away). Defensive and
-cached: if the provider is unreachable it returns an empty map and the bundled
-schedule/results are used unchanged. On a real server (e.g. the deployment) this
-keeps the fixtures list current without a code change.
+Polls SofaScore for World Cup matches across a window of recent days and returns
+finished scores and in-progress (live) scores keyed by canonical "home|away".
+Defensive and cached (90s): if the provider is unreachable nothing changes and
+the bundled schedule/results are used. On a real server this keeps both final
+results and live in-play scores current without a code change.
 """
 from __future__ import annotations
 
@@ -14,37 +14,50 @@ from ..models import ratings
 from . import cache, sofascore
 
 
-def _fetch_live_results() -> dict:
-    merged: dict = {}
+def _key(home: str, away: str) -> str:
+    return f"{ratings.canonical(home)}|{ratings.canonical(away)}"
+
+
+def _fetch_state() -> dict:
+    finished: dict = {}
+    inplay: dict = {}
     today = date.today()
     for offset in range(-3, 2):
         day = (today + timedelta(days=offset)).isoformat()
         res = sofascore.world_cup_results(day)
         if res:
-            for (home, away), score in res.items():
-                merged[f"{ratings.canonical(home)}|{ratings.canonical(away)}"] = score
-    return merged
+            for (h, a), score in res.items():
+                finished[_key(h, a)] = list(score)
+        liv = sofascore.world_cup_live(day)
+        if liv:
+            for (h, a), score in liv.items():
+                inplay[_key(h, a)] = list(score)
+    return {"finished": finished, "live": inplay}
 
 
-def live_results() -> dict:
-    """Cached map "home|away" (canonical) -> [goals_home, goals_away]."""
+def state() -> dict:
     try:
-        return cache.get_or_fetch("live_results", _fetch_live_results, ttl_minutes=5) or {}
+        return cache.get_or_fetch("live_state", _fetch_state, ttl_minutes=1.5) \
+            or {"finished": {}, "live": {}}
     except Exception:
-        return {}
+        return {"finished": {}, "live": {}}
 
 
 def overlay(fixtures: list[dict]) -> list[dict]:
-    """Apply any live finished scores onto fixtures (status + score)."""
-    live = live_results()
-    if not live:
+    """Apply live in-play and finished scores onto fixtures."""
+    s = state()
+    if not s["finished"] and not s["live"]:
         return fixtures
     out = []
     for fx in fixtures:
-        key = f"{ratings.canonical(fx['home'])}|{ratings.canonical(fx['away'])}"
-        if key in live and fx.get("status") != "finished":
-            gh, ga = live[key]
-            fx = {**fx, "status": "finished", "goals_home": gh,
-                  "goals_away": ga, "score": f"{gh}-{ga}"}
+        k = _key(fx["home"], fx["away"])
+        if k in s["live"]:
+            gh, ga = s["live"][k]
+            fx = {**fx, "status": "live", "goals_home": gh, "goals_away": ga,
+                  "score": f"{gh}-{ga}"}
+        elif k in s["finished"] and fx.get("status") != "finished":
+            gh, ga = s["finished"][k]
+            fx = {**fx, "status": "finished", "goals_home": gh, "goals_away": ga,
+                  "score": f"{gh}-{ga}"}
         out.append(fx)
     return out

@@ -1,7 +1,10 @@
 """Panini - personal FIFA World Cup prediction site (FastAPI)."""
 from __future__ import annotations
 
+import time as _time
+
 from fastapi import Depends, FastAPI, Form, HTTPException, Response
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -16,6 +19,22 @@ from .data import sources
 from .models import bracket, poisson, ratings, tips
 
 app = FastAPI(title="Predictions", docs_url=None, redoc_url=None)
+app.add_middleware(GZipMiddleware, minimum_size=600)
+
+# Short-lived response cache for the heavy prediction endpoints. Bumping
+# _cache_version invalidates everything (used when a result is recorded).
+_resp_cache: dict = {}
+_cache_version = 0
+
+
+def _cached(key: str, ttl: float, build):
+    now = _time.time()
+    ent = _resp_cache.get(key)
+    if ent and ent["v"] == _cache_version and now - ent["ts"] < ttl:
+        return ent["data"]
+    data = build()
+    _resp_cache[key] = {"data": data, "ts": now, "v": _cache_version}
+    return data
 
 
 def _effective_elo(name: str, use_form: bool) -> tuple[float, dict | None]:
@@ -68,15 +87,16 @@ class ChatRequest(BaseModel):
 
 @app.post("/api/chat")
 def api_chat(req: ChatRequest, _: bool = Depends(require_auth)):
-    if not ai.ai_enabled():
-        return {"reply": "Predi AI isn't switched on yet. Add an "
-                "ANTHROPIC_API_KEY environment variable to enable it.",
-                "enabled": False}
-    try:
-        return {"reply": ai.chat(req.messages), "enabled": True}
-    except Exception:
-        return {"reply": "Sorry — I hit an error answering that. Try again in a moment.",
-                "enabled": True}
+    last = next((m.get("content", "") for m in reversed(req.messages)
+                 if m.get("role") == "user"), "")
+    # Full Claude assistant when a key is configured; otherwise the built-in
+    # model-driven responder so Predi AI always works.
+    if ai.ai_enabled():
+        try:
+            return {"reply": ai.chat(req.messages), "enabled": True, "mode": "ai"}
+        except Exception:
+            pass
+    return {"reply": ai.local_answer(last), "enabled": True, "mode": "local"}
 
 
 @app.post("/api/login")
@@ -98,8 +118,7 @@ def api_logout():
 
 # ---- Fixtures + predictions ------------------------------------------------
 
-@app.get("/api/fixtures")
-def api_fixtures(_: bool = Depends(require_auth)):
+def _build_fixtures():
     data = sources.get_fixtures()
     enriched = []
     for fx in data["fixtures"]:
@@ -120,9 +139,12 @@ def api_fixtures(_: bool = Depends(require_auth)):
     return {"source": data["source"], "live": data["live"], "fixtures": enriched}
 
 
-@app.get("/api/tips")
-def api_tips(_: bool = Depends(require_auth)):
-    """A betting-tips board: the best tip for every upcoming match."""
+@app.get("/api/fixtures")
+def api_fixtures(_: bool = Depends(require_auth)):
+    return _cached("fixtures", 20, _build_fixtures)
+
+
+def _build_tips():
     data = sources.get_fixtures()
     board = []
     for fx in data["fixtures"]:
@@ -139,6 +161,12 @@ def api_tips(_: bool = Depends(require_auth)):
         })
     board.sort(key=lambda b: (-b["tip"]["stars"], -b["tip"]["prob"]))
     return {"tips": board, "bet_of_the_day": board[0] if board else None}
+
+
+@app.get("/api/tips")
+def api_tips(_: bool = Depends(require_auth)):
+    """A betting-tips board: the best tip for every upcoming match."""
+    return _cached("tips", 30, _build_tips)
 
 
 class PredictRequest(BaseModel):
@@ -217,8 +245,11 @@ class ResultRequest(BaseModel):
 
 @app.post("/api/result")
 def api_result(req: ResultRequest, _: bool = Depends(require_auth)):
-    return store.record_result(req.home, req.away, req.goals_home,
-                               req.goals_away, neutral=req.neutral)
+    global _cache_version
+    out = store.record_result(req.home, req.away, req.goals_home,
+                              req.goals_away, neutral=req.neutral)
+    _cache_version += 1
+    return out
 
 
 @app.get("/api/results")
@@ -228,7 +259,9 @@ def api_results(_: bool = Depends(require_auth)):
 
 @app.post("/api/ratings/reset")
 def api_reset(_: bool = Depends(require_auth)):
+    global _cache_version
     store.reset()
+    _cache_version += 1
     return {"ok": True}
 
 
