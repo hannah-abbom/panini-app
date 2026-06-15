@@ -11,8 +11,9 @@ from .auth import (COOKIE_NAME, SESSION_TTL_SECONDS, check_password,
                    issue_token, require_auth)
 from .config import settings
 from .data import form as form_data
+from .data import news as news_data
 from .data import sources
-from .models import bracket, poisson, ratings
+from .models import bracket, poisson, ratings, tips
 
 app = FastAPI(title="Panini", docs_url=None, redoc_url=None)
 
@@ -88,6 +89,7 @@ def api_fixtures(_: bool = Depends(require_auth)):
         pred = poisson.predict(fx["home"], fx["away"],
                                _wc_elo(fx["home"]), _wc_elo(fx["away"]),
                                neutral=True)
+        tip = tips.best_tip(pred.to_dict())
         enriched.append({**fx, "prediction": {
             "home_win": pred.result["home_win"],
             "draw": pred.result["draw"],
@@ -96,8 +98,30 @@ def api_fixtures(_: bool = Depends(require_auth)):
             "total_goals": pred.expected["total"],
             "btts": pred.goals["btts"]["yes"],
             "over25": pred.goals["over_under"]["2.5"]["over"],
+            "tip": tip,
         }})
     return {"source": data["source"], "live": data["live"], "fixtures": enriched}
+
+
+@app.get("/api/tips")
+def api_tips(_: bool = Depends(require_auth)):
+    """A betting-tips board: the best tip for every upcoming match."""
+    data = sources.get_fixtures()
+    board = []
+    for fx in data["fixtures"]:
+        if fx.get("status") == "finished":
+            continue
+        pred = poisson.predict(fx["home"], fx["away"],
+                               _wc_elo(fx["home"]), _wc_elo(fx["away"]),
+                               neutral=True).to_dict()
+        tip = tips.best_tip(pred)
+        board.append({
+            "id": fx["id"], "home": fx["home"], "away": fx["away"],
+            "round": fx["round"], "utc_date": fx["utc_date"], "tip": tip,
+            "acca": tips.match_accumulator(pred),
+        })
+    board.sort(key=lambda b: (-b["tip"]["stars"], -b["tip"]["prob"]))
+    return {"tips": board, "bet_of_the_day": board[0] if board else None}
 
 
 class PredictRequest(BaseModel):
@@ -117,6 +141,8 @@ def api_predict(req: PredictRequest, _: bool = Depends(require_auth)):
                            neutral=req.neutral)
     out = pred.to_dict()
     out["form"] = {"home": home_form, "away": away_form}
+    out["tip"] = tips.best_tip(out)
+    out["accumulator"] = tips.match_accumulator(out)
     return out
 
 
@@ -140,6 +166,11 @@ def _tier(elo: float) -> str:
     if elo >= 1750:
         return "Dark horses"
     return "Outsiders"
+
+
+@app.get("/api/news")
+def api_news(_: bool = Depends(require_auth)):
+    return {"items": news_data.get_news()}
 
 
 @app.get("/api/teams")

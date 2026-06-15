@@ -22,6 +22,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from . import elo
+from . import stats as stats_model
 
 MAX_GOALS = 10                 # score matrix goes 0..MAX_GOALS for each team
 ELO_PER_GOAL = 165.0           # Elo gap that corresponds to ~1 goal of supremacy
@@ -91,6 +92,7 @@ class Prediction:
     correct_scores: list
     matrix: list        # 6x6 grid (goals 0..5) in percent, for the heatmap
     advance: dict       # knockout: probability each side goes through
+    stats: dict         # corners, cards, shots on target, fouls + their markets
 
     def to_dict(self) -> dict:
         return {
@@ -107,6 +109,7 @@ class Prediction:
             "correct_scores": self.correct_scores,
             "matrix": self.matrix,
             "advance": self.advance,
+            "stats": self.stats,
         }
 
 
@@ -205,9 +208,10 @@ def predict(home: str, away: str, home_elo: float, away_elo: float,
         "supremacy": round(lam_h - lam_a, 2),
         "most_likely_score": correct_scores[0]["score"],
     }
+    match_stats = stats_model.match_stats(lam_h, lam_a, home_elo, away_elo)
     return Prediction(home, away, home_elo, away_elo, lam_h, lam_a,
                       result, goals, markets, expected, correct_scores,
-                      matrix6, advance)
+                      matrix6, advance, match_stats)
 
 
 def advance_probability(home_elo: float, away_elo: float,

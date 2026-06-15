@@ -74,6 +74,7 @@ function rowMarkup(fx) {
         <i class="s-d" style="width:${p.draw}%"></i>
         <i class="s-a" style="width:${p.away_win}%"></i>
       </span>
+      ${!fin && p.tip ? `<span class="rowtip">🎯 ${p.tip.selection} <b>@ ${p.tip.odds}</b> ${stars(p.tip.stars)}</span>` : ""}
     </div>`;
 }
 function renderMatchList(list) {
@@ -124,10 +125,18 @@ function insightText(fx, d) {
   const opp = top[0] === "home" ? fx.away : fx.home;
   return `<b>${top[2]}</b> are ${top[1]}% likely to beat ${opp}.`;
 }
+const odd = (pct) => (pct > 0 ? (100 / pct).toFixed(2) : "—");
 function marketsMarkup(fx, d) {
-  const ou = d.goals.over_under, mk = d.markets;
+  const ou = d.goals.over_under, mk = d.markets, r = d.result;
   const cs = d.correct_scores.map((c) => `<span class="chip">${c.score} <b>${c.prob}%</b></span>`).join("");
   return `<div class="mk-grid">
+    <div class="block"><h3>Betting odds (model fair value)</h3>
+      <div class="row"><span>${fx.home} win</span><b>${r.fair_odds.home ?? "—"}</b></div>
+      <div class="row"><span>Draw</span><b>${r.fair_odds.draw ?? "—"}</b></div>
+      <div class="row"><span>${fx.away} win</span><b>${r.fair_odds.away ?? "—"}</b></div>
+      <div class="row"><span>Over 2.5 / Under 2.5</span><span>${odd(ou["2.5"].over)} / ${odd(ou["2.5"].under)}</span></div>
+      <div class="row"><span>BTTS Yes / No</span><span>${odd(d.goals.btts.yes)} / ${odd(d.goals.btts.no)}</span></div>
+    </div>
     <div class="block"><h3>Double chance &amp; qualify</h3>
       <div class="row"><span>${fx.home} or draw (1X)</span><b>${d.result.double_chance["1X"]}%</b></div>
       <div class="row"><span>${fx.away} or draw (X2)</span><b>${d.result.double_chance["X2"]}%</b></div>
@@ -147,6 +156,34 @@ function marketsMarkup(fx, d) {
       <div class="row"><span>${fx.away} +1.5</span><b>${mk.handicap["away_+1.5"]}%</b></div>
     </div>
     <div class="block"><h3>Most likely scores</h3><div class="scores">${cs}</div></div>
+  </div>`;
+}
+const stars = (n) => "★★★".slice(0, n) + "☆☆☆".slice(0, 3 - n);
+function statBlock(name, s, unit) {
+  const lines = Object.entries(s.lines || {}).map(([l, v]) =>
+    `<div class="row"><span>Over ${l}</span><b>${v.over}%</b></div>`).join("");
+  return `<div class="block"><h3>${name}</h3>
+    <div class="row"><span>Expected total</span><b>${s.total}</b></div>
+    <div class="row"><span>Split (H / A)</span><span>${s.home} / ${s.away}</span></div>${lines}</div>`;
+}
+function statsMarkup(d) {
+  const s = d.stats;
+  return `<div class="mk-grid">
+    ${statBlock("Corners", s.corners)}
+    ${statBlock("Cards (yellows)", s.cards)}
+    ${statBlock("Shots on target", s.shots_on_target)}
+    <div class="block"><h3>Fouls</h3>
+      <div class="row"><span>Expected total</span><b>${s.fouls.total}</b></div>
+      <div class="row"><span>Split (H / A)</span><span>${s.fouls.home} / ${s.fouls.away}</span></div></div>
+  </div>`;
+}
+function tipBanner(d) {
+  if (!d.tip) return "";
+  const t = d.tip;
+  return `<div class="tip-banner c${t.stars}">
+    <div class="tip-label">🎯 Top tip · <span class="conf">${t.confidence} confidence ${stars(t.stars)}</span></div>
+    <div class="tip-pick">${t.selection}</div>
+    <div class="tip-odds">${t.prob}% · fair odds <b>${t.odds}</b></div>
   </div>`;
 }
 function heatmapMarkup(d) {
@@ -177,9 +214,11 @@ function detailMarkup(fx, d) {
       <div class="dt-team"><div class="dt-flag">${flag(fx.away)}</div><div class="dt-name">${fx.away}</div>
         <div class="dt-sub">Elo ${d.away_elo} ${af}</div></div>
     </div>
+    ${tipBanner(d)}
     <div class="dt-tabs">
       <button class="dt-tab active" data-sub="pred">Prediction</button>
       <button class="dt-tab" data-sub="mkts">Markets</button>
+      <button class="dt-tab" data-sub="stats">Stats</button>
       <button class="dt-tab" data-sub="heat">Heatmap</button>
     </div>
     <div class="dt-sub-panel active" data-sub="pred">
@@ -202,6 +241,7 @@ function detailMarkup(fx, d) {
       </div>
     </div>
     <div class="dt-sub-panel" data-sub="mkts">${marketsMarkup(fx, d)}</div>
+    <div class="dt-sub-panel" data-sub="stats">${statsMarkup(d)}</div>
     <div class="dt-sub-panel" data-sub="heat">${heatmapMarkup(d)}</div>`;
 }
 function wireSubTabs(container) {
@@ -235,6 +275,75 @@ async function loadRankings() {
       <div><div class="name">${t.name}</div><div class="tier">${t.tier}</div></div>
       <div class="rank-bar"><i style="width:${pct}%"></i></div><div class="elo">${t.elo}</div></div>`;
   }).join("");
+}
+
+// --- tips board + accumulator ----------------------------------------------
+let ACCA = [];   // [{key, label, odds}]
+function accaRefresh() {
+  const combined = ACCA.reduce((a, l) => a * l.odds, 1);
+  const stake = parseFloat(document.getElementById("acca-stake").value) || 0;
+  document.getElementById("acca-count").textContent = ACCA.length;
+  document.getElementById("acca-odds").textContent = combined.toFixed(2);
+  document.getElementById("acca-return").textContent = (combined * stake).toFixed(2);
+  document.querySelectorAll(".tip-add").forEach((b) => {
+    b.classList.toggle("on", ACCA.some((l) => l.key === b.dataset.key));
+  });
+}
+function accaToggle(key, label, odds) {
+  const i = ACCA.findIndex((l) => l.key === key);
+  if (i >= 0) ACCA.splice(i, 1); else ACCA.push({ key, label, odds });
+  accaRefresh();
+}
+document.getElementById("acca-stake").addEventListener("input", accaRefresh);
+document.getElementById("acca-clear").addEventListener("click", () => { ACCA = []; accaRefresh(); });
+
+async function loadTips() {
+  const data = await api("/api/tips");
+  const bod = data.bet_of_the_day;
+  const bodEl = document.getElementById("bet-of-day");
+  if (bod) {
+    bodEl.innerHTML = `<div class="bod">
+      <div class="bod-tag">⭐ Bet of the day</div>
+      <div class="bod-match">${flag(bod.home)} ${bod.home} vs ${bod.away} ${flag(bod.away)}<span class="bod-grp">${bod.round}</span></div>
+      <div class="bod-pick">${bod.tip.selection}</div>
+      <div class="bod-meta">${bod.tip.confidence} confidence ${stars(bod.tip.stars)} · ${bod.tip.prob}% · fair odds <b>${bod.tip.odds}</b></div>
+    </div>`;
+  }
+  const board = document.getElementById("tips-board");
+  board.innerHTML = data.tips.map((b) => {
+    const key = b.id, label = `${b.home}-${b.away}: ${b.tip.selection}`;
+    return `<div class="tip-row c${b.tip.stars}">
+      <div class="tip-mtch"><span>${flag(b.home)} ${b.home} v ${b.away} ${flag(b.away)}</span><span class="tip-grp">${b.round} · ${fmtDay(b.utc_date)}</span></div>
+      <div class="tip-sel">${b.tip.selection}</div>
+      <div class="tip-meta">${stars(b.tip.stars)} ${b.tip.prob}%</div>
+      <div class="tip-od">@ ${b.tip.odds}</div>
+      <button class="tip-add" data-key="${key}" data-label="${label}" data-odds="${b.tip.odds}">＋ acca</button>
+    </div>`;
+  }).join("");
+  board.querySelectorAll(".tip-add").forEach((btn) => {
+    btn.addEventListener("click", () => accaToggle(btn.dataset.key, btn.dataset.label, parseFloat(btn.dataset.odds)));
+  });
+  accaRefresh();
+}
+
+// --- news ------------------------------------------------------------------
+async function loadNews() {
+  const wrap = document.getElementById("newslist");
+  try {
+    const { items } = await api("/api/news");
+    if (!items.length) {
+      wrap.innerHTML = "<p class='hint'>No news right now (the feeds may be unreachable from this server).</p>";
+      return;
+    }
+    wrap.innerHTML = items.map((n) => `
+      <a class="news-card" href="${n.link}" target="_blank" rel="noopener">
+        <div class="news-src">${n.source}</div>
+        <div class="news-title">${n.title}</div>
+        <div class="news-date">${n.date || ""}</div>
+      </a>`).join("");
+  } catch (e) {
+    wrap.innerHTML = "<p class='hint'>Couldn't load news.</p>";
+  }
 }
 
 // --- team selects ----------------------------------------------------------
@@ -349,7 +458,7 @@ async function loadMeta() {
   try {
     await loadMeta();
     await loadTeams();
-    await Promise.all([loadFixtures(), loadRankings(), loadResultsLog()]);
+    await Promise.all([loadFixtures(), loadTips(), loadRankings(), loadResultsLog(), loadNews()]);
     renderBracketPicks(8);
   } catch (e) { /* 401 redirected */ }
 })();

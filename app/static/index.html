@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Panini · World Cup predictions</title>
-  <link rel="stylesheet" href="/static/styles.css?v=3" />
+  <link rel="stylesheet" href="/static/styles.css?v=5" />
 </head>
 <body>
   <div class="layout">
@@ -12,7 +12,9 @@
     <nav class="rail">
       <div class="rail-logo">⚽</div>
       <button class="rail-item active" data-tab="matches"><span class="ico">🗓️</span><span>Matches</span></button>
+      <button class="rail-item" data-tab="tips"><span class="ico">🎯</span><span>Tips</span></button>
       <button class="rail-item" data-tab="rankings"><span class="ico">📊</span><span>Ranking</span></button>
+      <button class="rail-item" data-tab="news"><span class="ico">📰</span><span>News</span></button>
       <button class="rail-item" data-tab="matchup"><span class="ico">⚔️</span><span>Matchup</span></button>
       <button class="rail-item" data-tab="knockout"><span class="ico">🏆</span><span>Knockout</span></button>
       <button class="rail-item" data-tab="value"><span class="ico">💰</span><span>Value</span></button>
@@ -44,12 +46,37 @@
         </aside>
       </section>
 
+      <!-- TIPS -->
+      <section id="tab-tips" class="panel">
+        <div class="pad">
+          <h2 class="ph">Betting tips</h2>
+          <p class="hint">The model's strongest sensible selection for every upcoming match, ranked by confidence. Build an accumulator from your picks.</p>
+          <div id="bet-of-day"></div>
+          <div class="acca-bar">
+            <span>Accumulator: <b id="acca-count">0</b> legs · combined odds <b id="acca-odds">1.00</b></span>
+            <label>Stake <input type="number" id="acca-stake" value="10" min="1" class="goals" /></label>
+            <span>Returns <b id="acca-return">0.00</b></span>
+            <button id="acca-clear" class="ghost">Clear</button>
+          </div>
+          <div id="tips-board" class="tips-board"></div>
+        </div>
+      </section>
+
       <!-- RANKINGS -->
       <section id="tab-rankings" class="panel">
         <div class="pad">
           <h2 class="ph">Power rankings</h2>
           <p class="hint">Live World-Football-Elo strength ratings — updated as results come in.</p>
           <div id="rankings" class="rankings"></div>
+        </div>
+      </section>
+
+      <!-- NEWS -->
+      <section id="tab-news" class="panel">
+        <div class="pad">
+          <h2 class="ph">Football news</h2>
+          <p class="hint">Latest headlines from BBC Sport, ESPN and Sky Sports — World Cup stories first.</p>
+          <div id="newslist" class="newslist"></div>
         </div>
       </section>
 
@@ -124,6 +151,6 @@
     </main>
   </div>
 
-  <script src="/static/app.js?v=3"></script>
+  <script src="/static/app.js?v=5"></script>
 </body>
 </html>

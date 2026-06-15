@@ -182,6 +182,51 @@ input, select, .pill-select { background: var(--panel-2); border: 1px solid var(
 .log-row .delta { color: var(--muted); font-size: 12px; }
 .toast { padding: 12px 16px; border-radius: 10px; border: 1px solid var(--accent); background: rgba(22,224,139,0.08); margin-bottom: 14px; font-size: 14px; }
 
+/* Row tip badge */
+.mrow .rowtip { grid-column: 1 / -1; margin-top: 7px; font-size: 11.5px; color: var(--gold); background: rgba(255,201,77,0.08); border: 1px solid rgba(255,201,77,0.25); border-radius: 7px; padding: 4px 8px; }
+.mrow .rowtip b { color: var(--gold); }
+
+/* Tip banner in detail */
+.tip-banner { background: linear-gradient(120deg,#1a2a1f,#15171c); border: 1px solid var(--accent); border-radius: 12px; padding: 12px 16px; margin-bottom: 12px; }
+.tip-banner.c2 { border-color: var(--gold); } .tip-banner.c1 { border-color: var(--muted); }
+.tip-banner .tip-label { font-size: 12px; color: var(--muted); }
+.tip-banner .conf { color: var(--accent); font-weight: 700; }
+.tip-banner.c2 .conf { color: var(--gold); }
+.tip-banner .tip-pick { font-size: 19px; font-weight: 800; margin: 4px 0 2px; }
+.tip-banner .tip-odds { font-size: 13px; color: var(--muted); }
+.tip-banner .tip-odds b { color: var(--text); }
+
+/* Tips board */
+.bod { background: linear-gradient(120deg,#23301f,#161a14); border: 1px solid var(--gold); border-radius: 16px; padding: 18px 20px; margin-bottom: 16px; }
+.bod-tag { font-size: 12px; font-weight: 800; color: var(--gold); text-transform: uppercase; letter-spacing: 0.6px; }
+.bod-match { font-size: 17px; font-weight: 700; margin: 6px 0; }
+.bod-grp { color: var(--muted); font-size: 12px; margin-left: 8px; }
+.bod-pick { font-size: 24px; font-weight: 800; }
+.bod-meta { color: var(--muted); font-size: 13px; margin-top: 4px; }
+.bod-meta b { color: var(--text); }
+.acca-bar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 10px 16px; margin-bottom: 14px; font-size: 14px; }
+.acca-bar b { color: var(--accent); }
+.acca-bar label { color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.tips-board { display: flex; flex-direction: column; gap: 6px; max-width: 920px; }
+.tip-row { display: grid; grid-template-columns: 1.4fr 1.4fr 70px 64px 90px; align-items: center; gap: 10px; background: var(--panel); border: 1px solid var(--border); border-left: 3px solid var(--muted); border-radius: 10px; padding: 10px 14px; }
+.tip-row.c3 { border-left-color: var(--accent); } .tip-row.c2 { border-left-color: var(--gold); }
+.tip-mtch span:first-child { font-weight: 600; display: block; font-size: 14px; }
+.tip-grp { color: var(--muted); font-size: 11px; }
+.tip-sel { font-weight: 700; color: var(--text); font-size: 14px; }
+.tip-meta { color: var(--gold); font-size: 13px; }
+.tip-od { font-weight: 700; }
+.tip-add { background: transparent; border: 1px solid var(--border); color: var(--muted); padding: 6px 8px; font-size: 12px; border-radius: 8px; }
+.tip-add.on { background: var(--accent); color: #04130a; border-color: var(--accent); }
+@media (max-width: 760px) { .tip-row { grid-template-columns: 1fr 1fr; } .tip-od, .tip-add { grid-column: span 1; } }
+
+/* News */
+.newslist { display: grid; grid-template-columns: repeat(auto-fill,minmax(280px,1fr)); gap: 12px; max-width: 1000px; }
+.news-card { display: block; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; text-decoration: none; color: var(--text); transition: 0.12s; }
+.news-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+.news-src { font-size: 11px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.5px; }
+.news-title { font-size: 15px; font-weight: 600; margin: 6px 0; line-height: 1.35; }
+.news-date { font-size: 11px; color: var(--muted); }
+
 /* ---- Responsive ---- */
 @media (max-width: 860px) {
   .rail { width: 100%; flex: none; height: auto; position: sticky; flex-direction: row; justify-content: space-around; padding: 6px; border-right: none; border-bottom: 1px solid var(--border); }
