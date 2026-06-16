@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Predictions · World Cup</title>
-  <link rel="stylesheet" href="/static/styles.css?v=15" />
+  <link rel="stylesheet" href="/static/styles.css?v=16" />
 </head>
 <body>
   <div class="layout">
@@ -20,6 +20,7 @@
       <button class="rail-item" data-tab="knockout"><span class="ico">🏆</span><span>Knockout</span></button>
       <button class="rail-item" data-tab="value"><span class="ico">💰</span><span>Value</span></button>
       <div class="rail-spacer"></div>
+      <button id="account-btn" class="rail-item"><span class="ico">👤</span><span>Account</span></button>
       <button id="theme-toggle" class="rail-item"><span class="ico">🌙</span><span>Theme</span></button>
       <button id="logout" class="rail-item" hidden><span class="ico">↩︎</span><span>Log out</span></button>
     </nav>
@@ -166,6 +167,14 @@
     </main>
   </div>
 
+  <!-- Account modal -->
+  <div id="account-modal" class="modal-overlay" hidden>
+    <div class="modal-box">
+      <button class="modal-x" id="account-close">×</button>
+      <div id="account-content"></div>
+    </div>
+  </div>
+
   <!-- AI helper (corner) -->
   <button id="chat-fab" title="Ask Predi AI">💬</button>
   <div id="chat-panel" hidden>
@@ -180,6 +189,6 @@
     </form>
   </div>
 
-  <script src="/static/app.js?v=15"></script>
+  <script src="/static/app.js?v=16"></script>
 </body>
 </html>

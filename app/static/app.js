@@ -254,7 +254,8 @@ function tipBanner(d) {
   if (!d.tip) return "";
   const t = d.tip;
   return `<div class="tip-banner c${t.stars}">
-    <div class="tip-label">🎯 Top tip · <span class="conf">${t.confidence} confidence ${stars(t.stars)}</span></div>
+    <div class="tip-label">🎯 Top tip · <span class="conf">${t.confidence} confidence ${stars(t.stars)}</span>
+      <button class="tip-save" data-match="${d.home} v ${d.away}" data-sel="${t.selection}" data-odds="${t.odds}" title="Save pick">🔖</button></div>
     <div class="tip-pick">${t.selection}</div>
     <div class="tip-odds">${t.prob}% · fair odds <b>${t.odds}</b></div>
   </div>`;
@@ -357,7 +358,8 @@ async function loadRankings() {
     const pct = Math.round(8 + 92 * (t.elo - min) / Math.max(1, max - min));
     return `<div class="rank-row"><div class="num">${t.rank}</div><div class="rflag">${flag(t.name)}</div>
       <div><div class="name">${t.name}</div><div class="tier">${t.tier}</div></div>
-      <div class="rank-bar"><i style="width:${pct}%"></i></div><div class="elo">${t.elo}</div></div>`;
+      <div class="rank-bar"><i style="width:${pct}%"></i></div><div class="elo">${t.elo}</div>
+      <button class="fav-star ${isFav(t.name) ? "on" : ""}" data-team="${t.name}" title="Follow">${isFav(t.name) ? "★" : "☆"}</button></div>`;
   }).join("");
 }
 
@@ -635,6 +637,111 @@ function initChat(aiEnabled) {
   });
 }
 
+// --- accounts --------------------------------------------------------------
+let USER = { user: null, favourites: [], saved: [] };
+const isFav = (t) => USER.favourites.includes(t);
+function updateAccountBtn() {
+  const btn = document.getElementById("account-btn");
+  const label = btn.querySelector("span:not(.ico)");
+  label.textContent = USER.user ? USER.user.email.split("@")[0] : "Account";
+  btn.querySelector(".ico").textContent = USER.user ? "✅" : "👤";
+}
+async function loadUser() {
+  try {
+    const d = await api("/api/auth/me");
+    USER = { user: d.user, favourites: d.favourites || [], saved: d.saved || [] };
+  } catch (e) { USER = { user: null, favourites: [], saved: [] }; }
+  updateAccountBtn();
+}
+function openAccount() { document.getElementById("account-modal").hidden = false; renderAccount(); }
+function closeAccount() { document.getElementById("account-modal").hidden = true; }
+let AUTH_MODE = "login";
+function renderAccount() {
+  const el = document.getElementById("account-content");
+  if (!USER.user) {
+    const other = AUTH_MODE === "login" ? "signup" : "login";
+    el.innerHTML = `
+      <h2 class="acct-h">${AUTH_MODE === "login" ? "Welcome back" : "Create your account"}</h2>
+      <p class="hint">Save favourite teams, your picks, and get personalised daily tips. Free.</p>
+      <form id="auth-form" class="auth-form">
+        <input id="auth-email" type="email" placeholder="Email" autocomplete="email" required />
+        <input id="auth-pass" type="password" placeholder="Password (6+ chars)" autocomplete="current-password" required />
+        <button type="submit">${AUTH_MODE === "login" ? "Log in" : "Sign up"}</button>
+        <p id="auth-err" class="error" hidden></p>
+      </form>
+      <p class="acct-switch">${AUTH_MODE === "login" ? "New here?" : "Have an account?"}
+        <a id="auth-switch">${AUTH_MODE === "login" ? "Create one" : "Log in"}</a> instead.</p>`;
+    document.getElementById("auth-switch").onclick = () => { AUTH_MODE = other; renderAccount(); };
+    document.getElementById("auth-form").onsubmit = authSubmit;
+    return;
+  }
+  const favs = USER.favourites.length
+    ? USER.favourites.map((t) => `<span class="chip-x">${flag(t)} ${t} <a class="fav-remove" data-team="${t}">×</a></span>`).join("")
+    : "<span class='hint'>None yet — tap the ☆ on a team in Rankings.</span>";
+  const saved = USER.saved.length
+    ? USER.saved.map((s) => `<div class="saved-row"><span>${s.match} — <b>${s.selection}</b> @ ${s.odds}</span><a class="saved-remove" data-id="${s.id}">×</a></div>`).join("")
+    : "<span class='hint'>No saved picks yet — tap 🔖 on a match's top tip.</span>";
+  el.innerHTML = `
+    <h2 class="acct-h">${USER.user.email}</h2>
+    <div class="plan-badge">${USER.user.plan.toUpperCase()} plan</div>
+    <h3 class="section-title">Following</h3><div class="chips-wrap">${favs}</div>
+    <h3 class="section-title">Saved picks</h3><div class="saved-wrap">${saved}</div>
+    <div id="daily-wrap"></div>
+    <button id="acct-logout" class="ghost" style="margin-top:18px">Log out</button>`;
+  document.getElementById("acct-logout").onclick = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    USER = { user: null, favourites: [], saved: [] }; updateAccountBtn(); renderAccount(); loadRankings();
+  };
+  loadDaily();
+}
+async function authSubmit(e) {
+  e.preventDefault();
+  const err = document.getElementById("auth-err");
+  err.hidden = true;
+  const body = { email: document.getElementById("auth-email").value, password: document.getElementById("auth-pass").value };
+  try {
+    const d = await jpost(`/api/auth/${AUTH_MODE === "login" ? "login" : "signup"}`, body);
+    USER = { user: d.user, favourites: d.favourites || [], saved: d.saved || [] };
+    updateAccountBtn(); renderAccount(); loadRankings();
+  } catch (e2) {
+    err.textContent = "Couldn't sign you in — check your details (or the email may be taken).";
+    err.hidden = false;
+  }
+}
+async function loadDaily() {
+  try {
+    const d = await api("/api/daily");
+    const wrap = document.getElementById("daily-wrap");
+    if (!wrap) return;
+    wrap.innerHTML = `<h3 class="section-title">Your daily AI picks</h3>` +
+      d.picks.map((b) => `<div class="saved-row"><span>${flag(b.home)} ${b.home} v ${b.away} ${flag(b.away)} — <b>${b.tip.selection}</b> @ ${b.tip.odds}</span></div>`).join("");
+  } catch (e) {}
+}
+async function toggleFav(team) {
+  if (!USER.user) { openAccount(); return; }
+  const path = isFav(team) ? "/api/favourites/remove" : "/api/favourites";
+  try { const d = await jpost(path, { team }); USER.favourites = d.favourites; loadRankings(); if (!document.getElementById("account-modal").hidden) renderAccount(); } catch (e) {}
+}
+async function savePick(match, selection, odds) {
+  if (!USER.user) { openAccount(); return; }
+  try { const d = await jpost("/api/saved", { match, selection, odds }); USER.saved = d.saved; toastMsg("Pick saved to your account ✓"); } catch (e) {}
+}
+async function removeFav(team) { try { const d = await jpost("/api/favourites/remove", { team }); USER.favourites = d.favourites; renderAccount(); loadRankings(); } catch (e) {} }
+async function removeSaved(id) { try { const d = await jpost("/api/saved/remove", { id }); USER.saved = d.saved; renderAccount(); } catch (e) {} }
+function toastMsg(text) {
+  const t = document.createElement("div"); t.className = "mini-toast"; t.textContent = text;
+  document.body.appendChild(t); setTimeout(() => t.remove(), 2200);
+}
+document.getElementById("account-btn").addEventListener("click", openAccount);
+document.getElementById("account-close").addEventListener("click", closeAccount);
+document.getElementById("account-modal").addEventListener("click", (e) => { if (e.target.id === "account-modal") closeAccount(); });
+document.addEventListener("click", (e) => {
+  const fs = e.target.closest(".fav-star"); if (fs) { toggleFav(fs.dataset.team); return; }
+  const ts = e.target.closest(".tip-save"); if (ts) { savePick(ts.dataset.match, ts.dataset.sel, parseFloat(ts.dataset.odds)); return; }
+  const fr = e.target.closest(".fav-remove"); if (fr) { removeFav(fr.dataset.team); return; }
+  const sr = e.target.closest(".saved-remove"); if (sr) { removeSaved(parseInt(sr.dataset.id, 10)); return; }
+});
+
 // --- theme -----------------------------------------------------------------
 (function initTheme() {
   const btn = document.getElementById("theme-toggle");
@@ -662,6 +769,7 @@ async function loadMeta() {
 (async function init() {
   try {
     await loadMeta();
+    await loadUser();
     await loadTeams();
     await Promise.all([loadFixtures(), loadTips(), loadAccuracy(), loadRankings(), loadResultsLog(), loadNews()]);
     renderBracketPicks(8);

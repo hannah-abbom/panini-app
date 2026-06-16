@@ -3,13 +3,13 @@ from __future__ import annotations
 
 import time as _time
 
-from fastapi import Depends, FastAPI, Form, HTTPException, Response
+from fastapi import Cookie, Depends, FastAPI, Form, HTTPException, Response
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import accuracy, ai, store
+from . import accuracy, ai, db, store, users
 from .auth import (COOKIE_NAME, SESSION_TTL_SECONDS, check_password,
                    issue_token, require_auth)
 from .config import settings
@@ -223,6 +223,125 @@ def api_news(_: bool = Depends(require_auth)):
 @app.get("/api/accuracy")
 def api_accuracy(_: bool = Depends(require_auth)):
     return accuracy.compute()
+
+
+# ---- User accounts (optional) ----------------------------------------------
+
+USER_COOKIE = "user_session"
+
+
+def current_user(user_session: str | None = Cookie(default=None)):
+    return users.user_from_token(user_session)
+
+
+def _require_user(u):
+    if not u:
+        raise HTTPException(status_code=401, detail="Please sign in.")
+    return u
+
+
+def _user_payload(u) -> dict:
+    return {"user": {"email": u["email"], "plan": u["plan"]},
+            "favourites": db.list_favs(u["id"]), "saved": db.list_saved(u["id"])}
+
+
+class AuthRequest(BaseModel):
+    email: str
+    password: str
+
+
+def _set_session(resp, uid: int):
+    resp.set_cookie(USER_COOKIE, users.make_token(uid),
+                    max_age=users.SESSION_TTL, httponly=True, samesite="lax")
+
+
+@app.post("/api/auth/signup")
+def api_signup(req: AuthRequest):
+    email = req.email.strip().lower()
+    if "@" not in email or "." not in email:
+        raise HTTPException(400, "Enter a valid email address.")
+    if len(req.password) < 6:
+        raise HTTPException(400, "Password must be at least 6 characters.")
+    if db.get_user_by_email(email):
+        raise HTTPException(409, "An account with that email already exists.")
+    uid = db.create_user(email, users.hash_pw(req.password))
+    resp = JSONResponse({"user": {"email": email, "plan": "free"}, "favourites": [], "saved": []})
+    _set_session(resp, uid)
+    return resp
+
+
+@app.post("/api/auth/login")
+def api_login_user(req: AuthRequest):
+    u = db.get_user_by_email(req.email.strip().lower())
+    if not u or not users.verify_pw(req.password, u["pw"]):
+        raise HTTPException(401, "Wrong email or password.")
+    resp = JSONResponse(_user_payload(u))
+    _set_session(resp, u["id"])
+    return resp
+
+
+@app.post("/api/auth/logout")
+def api_logout_user():
+    resp = JSONResponse({"ok": True})
+    resp.delete_cookie(USER_COOKIE)
+    return resp
+
+
+@app.get("/api/auth/me")
+def api_me(u=Depends(current_user)):
+    return _user_payload(u) if u else {"user": None}
+
+
+class TeamRequest(BaseModel):
+    team: str
+
+
+@app.post("/api/favourites")
+def api_add_fav(req: TeamRequest, u=Depends(current_user)):
+    _require_user(u)
+    db.add_fav(u["id"], req.team)
+    return {"favourites": db.list_favs(u["id"])}
+
+
+@app.post("/api/favourites/remove")
+def api_remove_fav(req: TeamRequest, u=Depends(current_user)):
+    _require_user(u)
+    db.remove_fav(u["id"], req.team)
+    return {"favourites": db.list_favs(u["id"])}
+
+
+class SaveRequest(BaseModel):
+    match: str
+    selection: str
+    odds: float
+
+
+@app.post("/api/saved")
+def api_save(req: SaveRequest, u=Depends(current_user)):
+    _require_user(u)
+    db.add_saved(u["id"], req.match, req.selection, req.odds)
+    return {"saved": db.list_saved(u["id"])}
+
+
+class SavedIdRequest(BaseModel):
+    id: int
+
+
+@app.post("/api/saved/remove")
+def api_remove_saved(req: SavedIdRequest, u=Depends(current_user)):
+    _require_user(u)
+    db.remove_saved(u["id"], req.id)
+    return {"saved": db.list_saved(u["id"])}
+
+
+@app.get("/api/daily")
+def api_daily(u=Depends(current_user)):
+    """Daily AI picks — favourites' matches first, then the strongest tips."""
+    board = _cached("tips", 30, _build_tips)["tips"]
+    favs = set(db.list_favs(u["id"])) if u else set()
+    if favs:
+        board = sorted(board, key=lambda b: (0 if (b["home"] in favs or b["away"] in favs) else 1))
+    return {"picks": board[:6], "favourites": list(favs)}
 
 
 @app.get("/api/teams")
