@@ -3,71 +3,192 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Panini · World Cup predictions</title>
-  <link rel="stylesheet" href="/static/styles.css" />
+  <title>Predictions · World Cup</title>
+  <link rel="stylesheet" href="/static/styles.css?v=16" />
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">⚽ Panini</div>
-    <div class="spacer"></div>
-    <span id="source-badge" class="badge"></span>
-    <button id="logout" class="ghost">Log out</button>
-  </header>
+  <div class="layout">
+    <!-- Left icon rail (FotMob-style) -->
+    <nav class="rail">
+      <div class="rail-logo">⚽<span class="rail-name">Predictions</span></div>
+      <button class="rail-item active" data-tab="matches"><span class="ico">🗓️</span><span>Matches</span></button>
+      <button class="rail-item" data-tab="tips"><span class="ico">🎯</span><span>Tips</span></button>
+      <button class="rail-item" data-tab="accuracy"><span class="ico">📈</span><span>Accuracy</span></button>
+      <button class="rail-item" data-tab="rankings"><span class="ico">📊</span><span>Ranking</span></button>
+      <button class="rail-item" data-tab="news"><span class="ico">📰</span><span>News</span></button>
+      <button class="rail-item" data-tab="matchup"><span class="ico">⚔️</span><span>Matchup</span></button>
+      <button class="rail-item" data-tab="knockout"><span class="ico">🏆</span><span>Knockout</span></button>
+      <button class="rail-item" data-tab="value"><span class="ico">💰</span><span>Value</span></button>
+      <div class="rail-spacer"></div>
+      <button id="account-btn" class="rail-item"><span class="ico">👤</span><span>Account</span></button>
+      <button id="theme-toggle" class="rail-item"><span class="ico">🌙</span><span>Theme</span></button>
+      <button id="logout" class="rail-item" hidden><span class="ico">↩︎</span><span>Log out</span></button>
+    </nav>
 
-  <nav class="tabs">
-    <button class="tab active" data-tab="fixtures">Fixtures</button>
-    <button class="tab" data-tab="matchup">Custom matchup</button>
-    <button class="tab" data-tab="value">Value calculator</button>
-  </nav>
+    <main class="content">
+      <!-- MATCHES: list + detail -->
+      <section id="tab-matches" class="panel active">
+        <div class="col-list">
+          <div class="list-head">
+            <div class="title">FIFA World Cup 2026</div>
+            <span id="source-badge" class="badge"></span>
+          </div>
+          <div class="filterbar">
+            <select id="round-filter" class="pill-select"><option value="">All groups</option></select>
+          </div>
+          <div id="matchlist" class="matchlist"></div>
+          <div class="datasrc">Ratings calibrated on real results from
+            <b>StatsBomb</b> open data. Live scores from SofaScore · news from
+            BBC, ESPN &amp; Sky. Model estimates only — bet responsibly.</div>
+        </div>
+        <aside class="col-detail">
+          <div id="detail-pane" class="detail-pane">
+            <div class="detail-empty">
+              <div class="big-ball">⚽</div>
+              <p>Select a match to see the full prediction.</p>
+            </div>
+          </div>
+        </aside>
+      </section>
 
-  <main>
-    <!-- Fixtures ------------------------------------------------------->
-    <section id="tab-fixtures" class="tab-panel active">
-      <p class="hint">Predicted from World-Football-Elo ratings via a
-        Dixon-Coles/Poisson goal model. Tap a match for full markets.</p>
-      <div id="fixtures" class="cards"></div>
-    </section>
+      <!-- TIPS -->
+      <section id="tab-tips" class="panel">
+        <div class="pad">
+          <h2 class="ph">Betting tips</h2>
+          <p class="hint">The model's three strongest bets for every upcoming match, ranked by confidence. Tap any pick to build an accumulator.</p>
+          <div id="bet-of-day"></div>
+          <div class="acca-bar">
+            <span>Accumulator: <b id="acca-count">0</b> legs · combined odds <b id="acca-odds">1.00</b></span>
+            <label>Stake <input type="number" id="acca-stake" value="10" min="1" class="goals" /></label>
+            <span>Returns <b id="acca-return">0.00</b></span>
+            <button id="acca-clear" class="ghost">Clear</button>
+          </div>
+          <div id="tips-board" class="tips-board"></div>
+        </div>
+      </section>
 
-    <!-- Custom matchup ------------------------------------------------->
-    <section id="tab-matchup" class="tab-panel">
-      <div class="picker">
-        <select id="home-team"></select>
-        <span class="vs">vs</span>
-        <select id="away-team"></select>
-        <label class="check">
-          <input type="checkbox" id="home-adv" />
-          home advantage for first team
-        </label>
-        <button id="run-matchup">Predict</button>
-      </div>
-      <div id="matchup-result"></div>
-    </section>
+      <!-- ACCURACY -->
+      <section id="tab-accuracy" class="panel">
+        <div class="pad">
+          <h2 class="ph">AI accuracy</h2>
+          <p class="hint">How the model's pre-match predictions compare to what actually happened — a live, honest walk-forward backtest that updates as games finish.</p>
+          <div id="accuracy-cards" class="acc-cards"></div>
+          <h3 class="section-title">Predicted vs actual</h3>
+          <div id="accuracy-log" class="acc-log"></div>
+        </div>
+      </section>
 
-    <!-- Value calculator ----------------------------------------------->
-    <section id="tab-value" class="tab-panel">
-      <p class="hint">Enter the model's probability and the bookmaker's
-        decimal odds to see your edge and a Kelly-criterion stake.</p>
-      <div class="value-form">
-        <label>Model probability (%)
-          <input type="number" id="v-prob" step="0.1" placeholder="42.5" />
-        </label>
-        <label>Bookmaker odds (decimal)
-          <input type="number" id="v-odds" step="0.01" placeholder="2.40" />
-        </label>
-        <button id="run-value">Calculate</button>
-      </div>
-      <div id="value-result"></div>
-    </section>
-  </main>
+      <!-- RANKINGS -->
+      <section id="tab-rankings" class="panel">
+        <div class="pad">
+          <h2 class="ph">Power rankings</h2>
+          <p class="hint">Live World-Football-Elo strength ratings — updated as results come in.</p>
+          <div id="rankings" class="rankings"></div>
+        </div>
+      </section>
 
-  <!-- Match detail modal ----------------------------------------------->
-  <div id="modal" class="modal" hidden>
-    <div class="modal-card">
-      <button id="modal-close" class="modal-close">×</button>
-      <div id="modal-body"></div>
+      <!-- NEWS -->
+      <section id="tab-news" class="panel">
+        <div class="pad">
+          <h2 class="ph">Football news</h2>
+          <p class="hint">Latest headlines from BBC Sport, ESPN and Sky Sports — World Cup stories first.</p>
+          <div id="newslist" class="newslist"></div>
+        </div>
+      </section>
+
+      <!-- MATCHUP -->
+      <section id="tab-matchup" class="panel">
+        <div class="pad">
+          <h2 class="ph">Custom matchup</h2>
+          <div class="picker">
+            <select id="home-team" class="pill-select"></select>
+            <span class="vs">vs</span>
+            <select id="away-team" class="pill-select"></select>
+            <label class="check"><input type="checkbox" id="home-adv" /> home advantage (1st team)</label>
+            <label class="check"><input type="checkbox" id="use-form" checked /> use recent form</label>
+            <button id="run-matchup">Predict</button>
+          </div>
+          <div id="matchup-result" class="inline-detail"></div>
+        </div>
+      </section>
+
+      <!-- KNOCKOUT -->
+      <section id="tab-knockout" class="panel">
+        <div class="pad">
+          <h2 class="ph">Knockout simulator</h2>
+          <p class="hint">Build a bracket and Monte-Carlo simulate it (extra time + penalties resolve draws).</p>
+          <div class="knockout-controls">
+            <select id="bracket-size" class="pill-select">
+              <option value="4">4 teams</option>
+              <option value="8" selected>8 teams</option>
+              <option value="16">16 teams</option>
+            </select>
+            <button id="seed-top" class="ghost">Seed with top teams</button>
+            <button id="run-bracket">Simulate</button>
+          </div>
+          <div id="bracket-picks" class="bracket-picks"></div>
+          <div id="bracket-result"></div>
+        </div>
+      </section>
+
+      <!-- VALUE -->
+      <section id="tab-value" class="panel">
+        <div class="pad">
+          <h2 class="ph">Value calculator</h2>
+          <p class="hint">Enter the model's probability and the bookmaker's decimal odds for your edge and Kelly stake.</p>
+          <div class="value-form">
+            <label>Model probability (%)<input type="number" id="v-prob" step="0.1" placeholder="42.5" /></label>
+            <label>Bookmaker odds (decimal)<input type="number" id="v-odds" step="0.01" placeholder="2.40" /></label>
+            <button id="run-value">Calculate</button>
+          </div>
+          <div id="value-result"></div>
+        </div>
+      </section>
+
+      <!-- RESULTS -->
+      <section id="tab-results" class="panel">
+        <div class="pad">
+          <h2 class="ph">Record a result</h2>
+          <p class="hint">Add a finished match to update the model's Elo ratings.</p>
+          <div class="result-form">
+            <select id="r-home" class="pill-select"></select>
+            <input type="number" id="r-gh" min="0" class="goals" placeholder="0" />
+            <span class="vs">–</span>
+            <input type="number" id="r-ga" min="0" class="goals" placeholder="0" />
+            <select id="r-away" class="pill-select"></select>
+            <button id="run-result">Save</button>
+            <button id="reset-ratings" class="ghost danger">Reset ratings</button>
+          </div>
+          <div id="result-feedback"></div>
+          <h3 class="section-title">Recent results</h3>
+          <div id="results-log" class="results-log"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Account modal -->
+  <div id="account-modal" class="modal-overlay" hidden>
+    <div class="modal-box">
+      <button class="modal-x" id="account-close">×</button>
+      <div id="account-content"></div>
     </div>
   </div>
 
-  <script src="/static/app.js"></script>
+  <!-- AI helper (corner) -->
+  <button id="chat-fab" title="Ask Predi AI">💬</button>
+  <div id="chat-panel" hidden>
+    <header class="chat-head">
+      <span>🤖 Predi AI</span>
+      <button id="chat-close" class="chat-x">×</button>
+    </header>
+    <div id="chat-msgs" class="chat-msgs"></div>
+    <form id="chat-form" class="chat-form">
+      <input id="chat-input" placeholder="Ask about a match or a bet…" autocomplete="off" />
+      <button type="submit">↑</button>
+    </form>
+  </div>
+
+  <script src="/static/app.js?v=16"></script>
 </body>
 </html>

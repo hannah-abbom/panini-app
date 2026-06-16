@@ -47,7 +47,12 @@ def token_is_valid(token: str | None) -> bool:
 
 
 def require_auth(panini_session: str | None = Cookie(default=None)) -> bool:
-    """FastAPI dependency that rejects unauthenticated API requests."""
+    """FastAPI dependency that rejects unauthenticated API requests.
+
+    When REQUIRE_AUTH is not enabled the app is open and this is a no-op.
+    """
+    if not settings.require_auth:
+        return True
     if not token_is_valid(panini_session):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"

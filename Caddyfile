@@ -1,0 +1,16 @@
+# Replace panini.example.com with your domain and set your email for
+# Let's Encrypt. Caddy then provisions and renews HTTPS certificates
+# automatically. With a real domain pointed at this server, the site is
+# served over HTTPS with no extra steps.
+
+panini.example.com {
+	encode gzip
+	reverse_proxy app:8000
+}
+
+# No domain yet? Comment out the block above and uncomment this one to serve
+# on http://localhost with a locally-trusted certificate:
+#
+# localhost {
+# 	reverse_proxy app:8000
+# }

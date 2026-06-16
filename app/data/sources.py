@@ -10,8 +10,8 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from . import cache, fotmob, sofascore
-from .sample_fixtures import SAMPLE_FIXTURES
+from . import cache, fotmob, live, sofascore
+from .wc2026_fixtures import WC2026_FIXTURES
 
 
 def _fetch_live() -> list[dict]:
@@ -40,4 +40,7 @@ def get_fixtures() -> dict:
     if fixtures:
         return {"fixtures": fixtures, "source": fixtures[0].get("source"),
                 "live": True}
-    return {"fixtures": SAMPLE_FIXTURES, "source": "sample", "live": False}
+    # Overlay any live finished scores onto the bundled schedule so results
+    # update automatically when the provider is reachable.
+    return {"fixtures": live.overlay(WC2026_FIXTURES),
+            "source": "2026 World Cup schedule", "live": False}

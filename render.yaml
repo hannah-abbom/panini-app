@@ -1,0 +1,19 @@
+# Render Blueprint — one-click deploy.
+# Open https://render.com/deploy?repo=https://github.com/hannah-abbom/panini-app
+# while logged in to Render; it reads this file, fills everything in, and asks
+# you to set ACCESS_PASSWORD. SECRET_KEY is generated automatically.
+services:
+  - type: web
+    name: panini
+    runtime: python
+    branch: claude/fifa-betting-model-rtwe4z
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: ACCESS_PASSWORD
+        sync: false          # you type this in the Render dashboard at deploy time
+      - key: SECRET_KEY
+        generateValue: true  # Render generates a strong random value
+      - key: CACHE_TTL_MINUTES
+        value: "30"

@@ -12,17 +12,26 @@ value/Kelly calculator so you can compare the model to a bookmaker's odds.
 ## What it does
 
 - **Fixtures view** — upcoming World Cup matches, each with win/draw/win
-  probabilities, the most likely scoreline, and expected total goals.
+  probabilities, most likely scoreline, expected goals, over-2.5 and BTTS,
+  filterable by round.
 - **Full match markets** — tap any match for:
-  - 1X2 and double chance (1X / 12 / X2)
-  - Over/Under 1.5, 2.5, 3.5 goals
-  - Both teams to score
-  - Most likely correct scores
-  - "Fair odds" implied by the model
-- **Custom matchup** — pick any two teams (e.g. a knockout-round what-if), with
-  an optional home-advantage toggle for the host nations.
+  - 1X2, double chance (1X / 12 / X2), and "fair odds"
+  - Over/Under 0.5–4.5 goals and the full total-goals distribution
+  - Both teams to score, clean sheets, win-to-nil
+  - Goal-line handicaps (±1.5)
+  - Expected points and knockout "to qualify" odds (extra time + penalties)
+  - Most likely correct scores **and a scoreline heatmap**
+- **Power rankings** — every nation's live Elo, tiered, updated as you record
+  results.
+- **Custom matchup** — pick any two teams (e.g. a knockout what-if), with
+  toggles for home advantage and recent-form weighting.
+- **Knockout simulator** — build a 4/8/16-team bracket and Monte-Carlo simulate
+  it to get each team's odds of reaching every round and lifting the trophy.
 - **Value calculator** — paste the model's probability and the bookmaker's
-  decimal odds; get your edge and a Kelly-criterion stake.
+  decimal odds; get the implied probability, your edge, and a Kelly stake.
+- **Results / self-learning ratings** — record finished matches; both teams'
+  Elo updates and **persists between sessions**, so the model sharpens as the
+  tournament unfolds.
 
 ## How the model works
 
@@ -37,9 +46,10 @@ value/Kelly calculator so you can compare the model to a bookmaker's odds.
 
 ## Data sources
 
-Fixtures and form are pulled from **FotMob** and **SofaScore**'s public JSON
-endpoints (`app/data/`), with a built-in **sample fixture set** so the app
-always works even when those are unreachable.
+Fixtures are pulled from **FotMob** and **SofaScore**'s public JSON endpoints,
+and each team's **recent form** (last 6 results) is fetched from SofaScore and
+turned into a small Elo nudge (`app/data/form.py`). There's a built-in **sample
+fixture set** so the app always works even when those providers are unreachable.
 
 > ⚠️ These providers have **no official public API**. The endpoints are
 > undocumented, can change or rate-limit without notice, and are subject to each
@@ -86,17 +96,33 @@ app/
   main.py            FastAPI routes (pages + JSON API)
   auth.py            single-user password + signed cookie
   config.py          .env settings
+  store.py           persistent, self-updating Elo ratings + result log
   models/
     ratings.py       seed Elo ratings + name aliases
     elo.py           Elo expected score + result updates
-    poisson.py       Dixon–Coles/Poisson engine + value/Kelly
+    poisson.py       Dixon–Coles/Poisson engine, all markets + value/Kelly
+    bracket.py       Monte-Carlo knockout bracket simulator
   data/
     fotmob.py        FotMob client (defensive)
-    sofascore.py     SofaScore client (defensive)
+    sofascore.py     SofaScore client + team form (defensive)
+    form.py          recent-form lookup -> Elo nudge
     sources.py       source aggregation + fallback chain
     cache.py         JSON file cache
     sample_fixtures.py  offline fallback fixtures
   static/            login + single-page UI (vanilla JS, no build step)
+
+Dockerfile, docker-compose.yml, Caddyfile, Procfile, DEPLOY.md  -> deployment
+```
+
+## Deployment
+
+See **[DEPLOY.md](DEPLOY.md)**. The quickest path to an HTTPS site is Docker +
+Caddy (automatic Let's Encrypt certificates):
+
+```bash
+cp .env.example .env      # set ACCESS_PASSWORD + SECRET_KEY
+# edit Caddyfile with your domain
+docker compose up -d --build
 ```
 
 ## Tuning the model

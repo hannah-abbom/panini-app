@@ -15,6 +15,9 @@ class Settings:
 
     access_password: str = os.getenv("ACCESS_PASSWORD", "changeme")
     secret_key: str = os.getenv("SECRET_KEY", "dev-insecure-secret-change-me")
+    # Login is OFF by default (personal tool). Set REQUIRE_AUTH=true to enable.
+    require_auth: bool = os.getenv("REQUIRE_AUTH", "").strip().lower() in (
+        "1", "true", "yes", "on")
     cache_ttl_minutes: int = int(os.getenv("CACHE_TTL_MINUTES", "30"))
     cache_dir: Path = BASE_DIR / ".cache"
     static_dir: Path = BASE_DIR / "app" / "static"
